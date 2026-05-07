@@ -20,7 +20,9 @@ interface Item {
   shares: number;
   netPerShare: number;
   effectiveTaxRate: number;
-  totalNetILS: number;
+  grossILS: number;
+  netILS: number;
+  taxILS: number;
 }
 
 export default function SalePriority({ data, priceUSD, rate, marginalRate }: Props) {
@@ -30,6 +32,8 @@ export default function SalePriority({ data, priceUSD, rate, marginalRate }: Pro
     if (g.blockedQty <= 0) continue;
     const cap = isCapitalTrack(g.grantDate);
     const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cap);
+    const grossILS = priceUSD * g.blockedQty * rate;
+    const netILS = net * g.blockedQty * rate;
     items.push({
       key: `rsu-${g.grantNumber}`,
       label: `RSU ${g.grantNumber} (${g.grantDate.toLocaleDateString('he-IL', { year: 'numeric', month: 'short' })})`,
@@ -37,13 +41,18 @@ export default function SalePriority({ data, priceUSD, rate, marginalRate }: Pro
       shares: g.blockedQty,
       netPerShare: net,
       effectiveTaxRate: rsuEffectiveTaxRate(g.fmvAtGrant, priceUSD, marginalRate, cap),
-      totalNetILS: g.blockedQty * net * rate,
+      grossILS,
+      netILS,
+      taxILS: grossILS - netILS,
     });
   }
 
   for (const o of data.options) {
     if (o.exercisableQty <= 0 || priceUSD <= o.exercisePrice) continue;
     const net = optionNetPerShare(o.exercisePrice, priceUSD);
+    // For options, gross = spread (sale - strike) since strike is the cost basis paid on exercise.
+    const grossILS = (priceUSD - o.exercisePrice) * o.exercisableQty * rate;
+    const netILS = net * o.exercisableQty * rate;
     items.push({
       key: `opt-${o.grantNumber}`,
       label: `אופציות ${o.grantNumber} (${o.grantDate.toLocaleDateString('he-IL', { year: 'numeric', month: 'short' })})`,
@@ -51,21 +60,28 @@ export default function SalePriority({ data, priceUSD, rate, marginalRate }: Pro
       shares: o.exercisableQty,
       netPerShare: net,
       effectiveTaxRate: optionEffectiveTaxRate(o.exercisePrice, priceUSD),
-      totalNetILS: o.exercisableQty * net * rate,
+      grossILS,
+      netILS,
+      taxILS: grossILS - netILS,
     });
   }
 
   for (const e of data.espp) {
     if (e.blockedQty <= 0) continue;
-    const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate);
+    const cap = isCapitalTrack(e.grantDate);
+    const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cap);
+    const grossILS = priceUSD * e.blockedQty * rate;
+    const netILS = net * e.blockedQty * rate;
     items.push({
       key: `espp-${e.purchaseDate.getTime()}`,
       label: `ESPP ${e.purchaseDate.toLocaleDateString('he-IL', { year: 'numeric', month: 'short' })}`,
       type: 'ESPP',
       shares: e.blockedQty,
       netPerShare: net,
-      effectiveTaxRate: esppEffectiveTaxRate(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate),
-      totalNetILS: e.blockedQty * net * rate,
+      effectiveTaxRate: esppEffectiveTaxRate(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cap),
+      grossILS,
+      netILS,
+      taxILS: grossILS - netILS,
     });
   }
 
@@ -96,10 +112,15 @@ export default function SalePriority({ data, priceUSD, rate, marginalRate }: Pro
               <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{item.label}</p>
               <p className="text-xs text-surface-500">{item.type} · {item.shares.toLocaleString()} מניות</p>
             </div>
-            <div className="text-left shrink-0">
-              <p className="text-sm font-bold">{formatILS(item.totalNetILS)}</p>
+            <div className="text-left shrink-0 space-y-0.5">
+              <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                {formatILS(item.netILS)} <span className="text-xs font-normal text-surface-500">נטו</span>
+              </p>
               <p className="text-xs text-surface-500">
-                ${item.netPerShare.toFixed(2)}/מניה · מס {(item.effectiveTaxRate * 100).toFixed(0)}%
+                ברוטו: {formatILS(item.grossILS)}
+              </p>
+              <p className="text-xs text-rose-600 dark:text-rose-400">
+                מס: {formatILS(item.taxILS)} ({(item.effectiveTaxRate * 100).toFixed(0)}%)
               </p>
             </div>
           </div>

@@ -32,7 +32,8 @@ export default function SummaryCards({ data, priceUSD, rate, marginalRate }: Pro
   let esppNetILS = 0;
   let esppShares = 0;
   for (const e of data.espp) {
-    const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate);
+    const cap = isCapitalTrack(e.grantDate);
+    const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cap);
     esppNetILS += e.blockedQty * net * rate;
     esppShares += e.blockedQty;
   }

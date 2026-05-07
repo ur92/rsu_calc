@@ -3,7 +3,7 @@ import { ArrowRight, Calculator, Moon, Sun } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import SalaryInput from './components/SalaryInput';
 import PriceSimulator from './components/PriceSimulator';
-import SummaryCards from './components/SummaryCards';
+import PortfolioOverview from './components/PortfolioOverview';
 import GrantsTable from './components/GrantsTable';
 import OptionsTable from './components/OptionsTable';
 import EsppTable from './components/EsppTable';
@@ -12,6 +12,7 @@ import VestingSchedule from './components/VestingSchedule';
 import { parseEtradeFile } from './lib/parseEtrade';
 import { marginalRate } from './lib/taxCalc';
 import { useStockPrice } from './lib/useStockPrice';
+import { useExchangeRate } from './lib/useExchangeRate';
 import type { ParsedData } from './lib/types';
 
 const DEFAULT_PRICE = 50;
@@ -19,7 +20,7 @@ const DEFAULT_RATE = 3.6;
 
 export default function App() {
   const [file, setFile] = useState<File | null>(null);
-  const [salary, setSalary] = useState<number>(0);
+  const [salary, setSalary] = useState<number>(300_000);
   const [parsed, setParsed] = useState<ParsedData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -27,7 +28,10 @@ export default function App() {
   const { priceUSD: livePrice, isLive, isLoading } = useStockPrice(DEFAULT_PRICE);
   const [priceOverride, setPriceOverride] = useState<number | null>(null);
   const priceUSD = priceOverride ?? livePrice;
-  const [rate, setRate] = useState<number>(DEFAULT_RATE);
+
+  const { rate: liveRate, isLive: rateIsLive, isLoading: rateIsLoading } = useExchangeRate(DEFAULT_RATE);
+  const [rateOverride, setRateOverride] = useState<number | null>(null);
+  const rate = rateOverride ?? liveRate;
 
   const [isDark, setIsDark] = useState<boolean>(() => localStorage.getItem('rsu-dark') === '1');
   useEffect(() => {
@@ -158,12 +162,22 @@ export default function App() {
           priceUSD={priceUSD}
           onPriceChange={(v) => setPriceOverride(v)}
           rate={rate}
-          onRateChange={setRate}
+          onRateChange={(v) => setRateOverride(v)}
           isLive={isLive && priceOverride === null}
           isLoading={isLoading}
+          isRateLive={rateIsLive && rateOverride === null}
+          isRateLoading={rateIsLoading}
         />
 
-        <SummaryCards data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
+        <PortfolioOverview data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
+
+        <Section title="סדר עדיפות למכירה" subtitle="מסודר לפי שיעור מס אפקטיבי מהנמוך לגבוה.">
+          <SalePriority data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
+        </Section>
+
+        <Section title="הבשלות ב-12 החודשים הקרובים">
+          <VestingSchedule data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
+        </Section>
 
         <Section title="RSU Grants" subtitle="ניתן לערוך FMV ביום הענקה — eTrade לא מייצא ערך זה ישירות, ברירת מחדל לקוחה מה-vest הראשון.">
           <GrantsTable
@@ -181,14 +195,6 @@ export default function App() {
 
         <Section title="ESPP">
           <EsppTable espp={parsed.espp} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
-        </Section>
-
-        <Section title="הבשלות ב-12 החודשים הקרובים">
-          <VestingSchedule data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
-        </Section>
-
-        <Section title="סדר עדיפות למכירה" subtitle="מסודר לפי שיעור מס אפקטיבי מהנמוך לגבוה.">
-          <SalePriority data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
         </Section>
 
         <footer className="pt-8 pb-4 text-center text-xs text-surface-400 dark:text-surface-600">

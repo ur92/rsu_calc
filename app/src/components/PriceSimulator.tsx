@@ -5,29 +5,41 @@ interface Props {
   onRateChange: (v: number) => void;
   isLive?: boolean;
   isLoading?: boolean;
+  isRateLive?: boolean;
+  isRateLoading?: boolean;
+}
+
+function LiveBadge({ loading, live, loadingText, liveText }: {
+  loading?: boolean;
+  live?: boolean;
+  loadingText: string;
+  liveText: string;
+}) {
+  if (loading) return <span className="text-xs text-surface-400">{loadingText}</span>;
+  if (live) return (
+    <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+      {liveText}
+    </span>
+  );
+  return null;
 }
 
 export default function PriceSimulator({
-  priceUSD, onPriceChange, rate, onRateChange, isLive, isLoading,
+  priceUSD, onPriceChange, rate, onRateChange, isLive, isLoading, isRateLive, isRateLoading,
 }: Props) {
   return (
     <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 space-y-5">
-      <div className="flex items-baseline justify-between flex-wrap gap-2">
-        <h3 className="font-semibold text-surface-800 dark:text-surface-200">סימולטור מחיר ושער</h3>
-        {isLoading && <span className="text-xs text-surface-400">טוען מחיר חי...</span>}
-        {!isLoading && isLive && (
-          <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-            מחיר חי
-          </span>
-        )}
-      </div>
+      <h3 className="font-semibold text-surface-800 dark:text-surface-200">סימולטור מחיר ושער</h3>
 
       <div className="grid md:grid-cols-2 gap-5">
         <div className="space-y-2">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-center justify-between">
             <label className="text-sm text-surface-600 dark:text-surface-400">מחיר FROG</label>
-            <span className="font-bold text-lg">${priceUSD.toFixed(2)}</span>
+            <div className="flex items-center gap-2">
+              <LiveBadge loading={isLoading} live={isLive} loadingText="טוען..." liveText="מחיר חי" />
+              <span className="font-bold text-lg">${priceUSD.toFixed(2)}</span>
+            </div>
           </div>
           <input
             type="range"
@@ -52,16 +64,19 @@ export default function PriceSimulator({
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-center justify-between">
             <label className="text-sm text-surface-600 dark:text-surface-400">שער ₪/$</label>
-            <span className="font-bold text-lg">{rate.toFixed(2)}</span>
+            <div className="flex items-center gap-2">
+              <LiveBadge loading={isRateLoading} live={isRateLive} loadingText="טוען..." liveText="שער חי" />
+              <span className="font-bold text-lg">{rate.toFixed(3)}</span>
+            </div>
           </div>
           <input
             type="range"
-            min={3.0}
-            max={4.5}
+            min={2.5}
+            max={4.0}
             step={0.01}
-            value={Math.min(4.5, Math.max(3.0, rate))}
+            value={Math.min(4.0, Math.max(2.5, rate))}
             onChange={(e) => onRateChange(Number(e.target.value))}
             className="w-full accent-primary-500"
           />
@@ -69,7 +84,7 @@ export default function PriceSimulator({
             <input
               type="number"
               min={0.1}
-              step={0.01}
+              step={0.001}
               value={rate}
               onChange={(e) => { const v = Number(e.target.value); if (v > 0) onRateChange(v); }}
               className="w-24 px-2 py-1 text-sm rounded border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900"

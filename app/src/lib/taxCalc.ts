@@ -66,27 +66,32 @@ export function optionEffectiveTaxRate(strike: number, salePrice: number): numbe
 }
 
 /**
- * Net per share for ESPP. Discount portion (purchaseDateFmv − purchasePrice)
- * is taxed at marginal rate; appreciation above purchaseDateFmv at capital gains.
+ * Net per share for ESPP.
+ * Discount portion (purchaseDateFmv − purchasePrice) always taxed at marginal rate.
+ * Appreciation above purchaseDateFmv: capital gains (28%) if capital track (24+ months
+ * from grant date), otherwise marginal rate.
  */
 export function esppNetPerShare(
   purchasePrice: number,
   purchaseDateFmv: number,
   salePrice: number,
-  rate: number,
+  marginalRate: number,
+  capitalTrack: boolean,
 ): number {
   const discount = Math.max(0, purchaseDateFmv - purchasePrice);
   const appreciation = Math.max(0, salePrice - purchaseDateFmv);
-  return Math.max(0, salePrice - discount * rate - appreciation * CAPITAL_GAINS_RATE);
+  const appreciationTax = capitalTrack ? CAPITAL_GAINS_RATE : marginalRate;
+  return Math.max(0, salePrice - discount * marginalRate - appreciation * appreciationTax);
 }
 
 export function esppEffectiveTaxRate(
   purchasePrice: number,
   purchaseDateFmv: number,
   salePrice: number,
-  rate: number,
+  marginalRate: number,
+  capitalTrack: boolean,
 ): number {
   if (salePrice <= 0) return 0;
-  const net = esppNetPerShare(purchasePrice, purchaseDateFmv, salePrice, rate);
+  const net = esppNetPerShare(purchasePrice, purchaseDateFmv, salePrice, marginalRate, capitalTrack);
   return 1 - net / salePrice;
 }
