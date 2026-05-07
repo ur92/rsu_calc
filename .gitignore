@@ -1,0 +1,20 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+.netlify/
+
+# build artifacts
+app/dist/
+app/node_modules/
+app/.tmp/
+
+# editor
+.vscode/
+.idea/
+*.swp
+
+# user uploads
+*.xlsx
+*.xls
+!ByBenefitType_example.xlsx

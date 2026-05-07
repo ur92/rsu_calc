@@ -1,0 +1,30 @@
+# Netlify deployment configuration for rsu_calc (rsucalcjfrog)
+#
+# Cost model:
+#   - Deploy previews (PR-triggered): FREE and unlimited
+#   - Production deploys (main branch): consume credits
+#   - Branch deploys (non-PR push): DISABLED below to save credits
+#
+# Workflow: open a PR for any feature branch -> free deploy preview generated automatically.
+
+[build]
+  command = "cd app && npm install && npm run build"
+  publish = "app/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[context.deploy-preview]
+  command = "cd app && npm install && npm run build"
+
+[context.branch-deploy]
+  ignore = "exit 0"
+
+[[edge_functions]]
+  path = "/api/stock-price"
+  function = "stockPrice"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
