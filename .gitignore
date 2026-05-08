@@ -15,7 +15,11 @@ app/.tmp/
 .idea/
 *.swp
 
-# user uploads
+# user uploads & screenshots — never commit personal data
 *.xlsx
 *.xls
+*.pdf
+*.jpg
+*.jpeg
+*.png
 !ByBenefitType_example.xlsx
