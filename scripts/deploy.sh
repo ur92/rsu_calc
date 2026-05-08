@@ -1,92 +1,73 @@
 #!/usr/bin/env bash
 #
-# Manual production deploy to Netlify via direct API.
+# Manual production deploy to Netlify via git-triggered build API.
 #
-# Why direct API: corporate Zscaler proxy redirects all npm traffic through
-# JFrog, where the netlify-cli's `unstorage@^1.16.1` dependency is curated
-# out, so `npx netlify-cli` cannot be installed on this network.
+# Why git build instead of zip upload: Netlify zip API deploys do NOT support
+# serverless functions. Triggering a build from the linked git repo lets
+# Netlify process and deploy functions properly.
 #
-# Auth: set NETLIFY_AUTH_TOKEN. Create one at:
+# Auth: set NETLIFY_AUTH_TOKEN in .env or environment. Create one at:
 #   https://app.netlify.com/user/applications#personal-access-tokens
 #
-# Site: defaults to rsucalcjfrog.netlify.app. Override with NETLIFY_SITE_ID.
-#
 # Usage:
-#   scripts/deploy.sh             # production deploy
-#   scripts/deploy.sh --draft     # draft (preview) deploy
+#   scripts/deploy.sh           # trigger production build from current main
+#   scripts/deploy.sh --wait    # also wait and print final URL
 
 set -euo pipefail
 
 # Load .env from repo root if present
-REPO_ROOT_EARLY="$(cd "$(dirname "$0")/.." && pwd)"
-if [[ -f "$REPO_ROOT_EARLY/.env" ]]; then
-  set -a; source "$REPO_ROOT_EARLY/.env"; set +a
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ -f "$REPO_ROOT/.env" ]]; then
+  set -a; source "$REPO_ROOT/.env"; set +a
 fi
 
-SITE="${NETLIFY_SITE_ID:-rsucalcjfrog.netlify.app}"
+SITE_ID="8732229d-3b9a-40e4-aa71-37c7d02f83b4"
 API="https://api.netlify.com/api/v1"
-DRAFT="false"
+WAIT=false
 
-if [[ "${1:-}" == "--draft" ]]; then
-  DRAFT="true"
+if [[ "${1:-}" == "--wait" ]]; then
+  WAIT=true
 fi
 
 if [[ -z "${NETLIFY_AUTH_TOKEN:-}" ]]; then
   echo "ERROR: NETLIFY_AUTH_TOKEN not set." >&2
-  echo "  Create a token at https://app.netlify.com/user/applications#personal-access-tokens" >&2
-  echo "  Then: export NETLIFY_AUTH_TOKEN=<token>" >&2
+  echo "  Add it to .env or: export NETLIFY_AUTH_TOKEN=<token>" >&2
   exit 1
 fi
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP_DIR="$REPO_ROOT/app"
-DIST_DIR="$APP_DIR/dist"
-
-echo "==> [1/4] Building app..."
-cd "$APP_DIR"
-npm run build
-
-echo "==> [2/4] Assembling deploy bundle..."
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
-
-# Static dist content goes at the bundle root.
-cp -R "$DIST_DIR"/. "$WORK"/
-
-# Include netlify.toml, edge-functions, and serverless functions.
-cp "$REPO_ROOT/netlify.toml" "$WORK/netlify.toml"
-if [[ -d "$REPO_ROOT/netlify/edge-functions" ]]; then
-  mkdir -p "$WORK/netlify/edge-functions"
-  cp -R "$REPO_ROOT/netlify/edge-functions"/. "$WORK/netlify/edge-functions"/
-fi
-if [[ -d "$REPO_ROOT/netlify/functions" ]]; then
-  mkdir -p "$WORK/netlify/functions"
-  cp -R "$REPO_ROOT/netlify/functions"/. "$WORK/netlify/functions"/
-fi
-
-ZIP="$WORK/site.zip"
-( cd "$WORK" && zip -qr "$ZIP" . -x "site.zip" )
-
-echo "==> [3/4] Resolving site ID..."
-SITE_RESPONSE=$(curl -fsSL \
+echo "==> Triggering Netlify build from git..."
+RESPONSE=$(curl -fsSk -X POST \
   -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
-  "$API/sites/$SITE")
-SITE_ID=$(echo "$SITE_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['site_id'])")
-echo "    site_id: $SITE_ID"
+  -H "Content-Type: application/json" \
+  "$API/sites/$SITE_ID/builds")
 
-echo "==> [4/4] Uploading to Netlify (draft=$DRAFT)..."
-DEPLOY_RESPONSE=$(curl -fsSL -X POST \
-  -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
-  -H "Content-Type: application/zip" \
-  --data-binary "@$ZIP" \
-  "$API/sites/$SITE_ID/deploys?draft=$DRAFT&title=manual-cli-deploy")
+BUILD_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+DEPLOY_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['deploy_id'])")
+echo "    build_id:  $BUILD_ID"
+echo "    deploy_id: $DEPLOY_ID"
+echo "    admin:     https://app.netlify.com/projects/rsucalcjfrog/deploys/$DEPLOY_ID"
 
-DEPLOY_ID=$(echo "$DEPLOY_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-DEPLOY_URL=$(echo "$DEPLOY_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('deploy_ssl_url') or d.get('ssl_url'))")
-LOG_URL=$(echo "$DEPLOY_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('admin_url',''))")
-
-echo ""
-echo "Deployed!"
-echo "  deploy_id: $DEPLOY_ID"
-echo "  url:       $DEPLOY_URL"
-[[ -n "$LOG_URL" ]] && echo "  admin:     $LOG_URL/deploys/$DEPLOY_ID"
+if [[ "$WAIT" == "true" ]]; then
+  echo ""
+  echo "==> Waiting for build to finish..."
+  for i in $(seq 1 40); do
+    sleep 15
+    STATE=$(curl -fsSk \
+      -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
+      "$API/sites/$SITE_ID/deploys/$DEPLOY_ID" \
+      | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','?'))")
+    echo "    [$i] state: $STATE"
+    if [[ "$STATE" == "ready" ]]; then
+      echo ""
+      echo "Deployed! https://rsucalcjfrog.netlify.app"
+      break
+    elif [[ "$STATE" == "error" ]]; then
+      echo "ERROR: build failed." >&2
+      exit 1
+    fi
+  done
+else
+  echo ""
+  echo "Build triggered. Run with --wait to poll for completion."
+  echo "Or watch: https://app.netlify.com/projects/rsucalcjfrog/deploys/$DEPLOY_ID"
+fi
