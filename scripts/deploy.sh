@@ -17,6 +17,12 @@
 
 set -euo pipefail
 
+# Load .env from repo root if present
+REPO_ROOT_EARLY="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ -f "$REPO_ROOT_EARLY/.env" ]]; then
+  set -a; source "$REPO_ROOT_EARLY/.env"; set +a
+fi
+
 SITE="${NETLIFY_SITE_ID:-rsucalcjfrog.netlify.app}"
 API="https://api.netlify.com/api/v1"
 DRAFT="false"
@@ -47,11 +53,15 @@ trap 'rm -rf "$WORK"' EXIT
 # Static dist content goes at the bundle root.
 cp -R "$DIST_DIR"/. "$WORK"/
 
-# Include netlify.toml and edge-functions source so Netlify bundles them.
+# Include netlify.toml, edge-functions, and serverless functions.
 cp "$REPO_ROOT/netlify.toml" "$WORK/netlify.toml"
 if [[ -d "$REPO_ROOT/netlify/edge-functions" ]]; then
   mkdir -p "$WORK/netlify/edge-functions"
   cp -R "$REPO_ROOT/netlify/edge-functions"/. "$WORK/netlify/edge-functions"/
+fi
+if [[ -d "$REPO_ROOT/netlify/functions" ]]; then
+  mkdir -p "$WORK/netlify/functions"
+  cp -R "$REPO_ROOT/netlify/functions"/. "$WORK/netlify/functions"/
 fi
 
 ZIP="$WORK/site.zip"

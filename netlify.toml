@@ -23,6 +23,9 @@
 [build.environment]
   NODE_VERSION = "22"
 
+[functions]
+  directory = "netlify/functions"
+
 [context.deploy-preview]
   command = "cd app && npm install && npm run build"
 
@@ -37,6 +40,12 @@
 [[edge_functions]]
   path = "/api/stock-price"
   function = "stockPrice"
+
+[[redirects]]
+  from = "/api/stock-price"
+  to = "/.netlify/functions/stock-price"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
