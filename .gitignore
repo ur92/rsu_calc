@@ -23,3 +23,4 @@ app/.tmp/
 *.jpeg
 *.png
 !ByBenefitType_example.xlsx
+!sample_data/demo_ByBenefitType_expanded.xlsx
