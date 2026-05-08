@@ -7,10 +7,11 @@ interface Props {
   priceUSD: number;
   rate: number;
   marginalRate: number;
+  cgRate: number;
   onEditFmv?: (grantNumber: string, fmv: number) => void;
 }
 
-export default function GrantsTable({ rsus, priceUSD, rate, marginalRate, onEditFmv }: Props) {
+export default function GrantsTable({ rsus, priceUSD, rate, marginalRate, cgRate, onEditFmv }: Props) {
   const sorted = [...rsus].sort((a, b) => a.grantDate.getTime() - b.grantDate.getTime());
 
   if (sorted.length === 0) {
@@ -37,8 +38,8 @@ export default function GrantsTable({ rsus, priceUSD, rate, marginalRate, onEdit
         <tbody className="divide-y divide-surface-100 dark:divide-surface-800">
           {sorted.map((g) => {
             const cap = isCapitalTrack(g.grantDate);
-            const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cap);
-            const effRate = rsuEffectiveTaxRate(g.fmvAtGrant, priceUSD, marginalRate, cap);
+            const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cgRate, cap);
+            const effRate = rsuEffectiveTaxRate(g.fmvAtGrant, priceUSD, marginalRate, cgRate, cap);
             const totalNet = g.blockedQty * net * rate;
             return (
               <tr key={g.grantNumber} className="hover:bg-surface-50 dark:hover:bg-surface-800/30">

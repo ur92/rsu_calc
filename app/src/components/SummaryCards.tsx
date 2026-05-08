@@ -9,14 +9,15 @@ interface Props {
   priceUSD: number;
   rate: number;
   marginalRate: number;
+  cgRate: number;
 }
 
-export default function SummaryCards({ data, priceUSD, rate, marginalRate }: Props) {
+export default function SummaryCards({ data, priceUSD, rate, marginalRate, cgRate }: Props) {
   let rsuNetILS = 0;
   let rsuShares = 0;
   for (const g of data.rsus) {
     const cap = isCapitalTrack(g.grantDate);
-    const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cap);
+    const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cgRate, cap);
     rsuNetILS += g.blockedQty * net * rate;
     rsuShares += g.blockedQty;
   }
@@ -24,7 +25,7 @@ export default function SummaryCards({ data, priceUSD, rate, marginalRate }: Pro
   let optionNetILS = 0;
   let optionShares = 0;
   for (const o of data.options) {
-    const net = optionNetPerShare(o.exercisePrice, priceUSD);
+    const net = optionNetPerShare(o.exercisePrice, priceUSD, cgRate);
     optionNetILS += o.exercisableQty * net * rate;
     optionShares += o.exercisableQty;
   }
@@ -33,7 +34,7 @@ export default function SummaryCards({ data, priceUSD, rate, marginalRate }: Pro
   let esppShares = 0;
   for (const e of data.espp) {
     const cap = isCapitalTrack(e.grantDate);
-    const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cap);
+    const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cgRate, cap);
     esppNetILS += e.blockedQty * net * rate;
     esppShares += e.blockedQty;
   }

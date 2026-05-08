@@ -8,9 +8,10 @@ import GrantsTable from './components/GrantsTable';
 import OptionsTable from './components/OptionsTable';
 import EsppTable from './components/EsppTable';
 import SalePriority from './components/SalePriority';
-import VestingSchedule from './components/VestingSchedule';
+import AvailableNowTable from './components/AvailableNowTable';
+import FutureVestsTable from './components/FutureVestsTable';
 import { parseEtradeFile } from './lib/parseEtrade';
-import { marginalRate } from './lib/taxCalc';
+import { marginalRate, capitalGainsRate } from './lib/taxCalc';
 import { useStockPrice } from './lib/useStockPrice';
 import { useExchangeRate } from './lib/useExchangeRate';
 import type { ParsedData } from './lib/types';
@@ -40,6 +41,7 @@ export default function App() {
   }, [isDark]);
 
   const mRate = useMemo(() => marginalRate(salary), [salary]);
+  const cgRate = useMemo(() => capitalGainsRate(salary), [salary]);
 
   const handleAnalyze = async () => {
     if (!file) return;
@@ -169,15 +171,21 @@ export default function App() {
           isRateLoading={rateIsLoading}
         />
 
-        <PortfolioOverview data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
+        <PortfolioOverview data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
 
-        <Section title="סדר עדיפות למכירה" subtitle="מסודר לפי שיעור מס אפקטיבי מהנמוך לגבוה.">
-          <SalePriority data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
-        </Section>
-
-        <Section title="הבשלות ב-12 החודשים הקרובים">
-          <VestingSchedule data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
-        </Section>
+        <div className="grid lg:grid-cols-2 gap-5 lg:items-start">
+          <div className="space-y-5">
+            <Section title="מניות זמינות עכשיו">
+              <AvailableNowTable data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
+            </Section>
+            <Section title="מניות עם הבשלה עתידית" subtitle="כל ההבשלות מעתה ועד תום לוח ה-vesting; שווי נטו במחיר הנוכחי.">
+              <FutureVestsTable data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
+            </Section>
+          </div>
+          <Section title="סדר עדיפות למכירה" subtitle="מסודר לפי שיעור מס אפקטיבי מהנמוך לגבוה.">
+            <SalePriority data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
+          </Section>
+        </div>
 
         <Section title="RSU Grants" subtitle="ניתן לערוך FMV ביום הענקה — eTrade לא מייצא ערך זה ישירות, ברירת מחדל לקוחה מה-vest הראשון.">
           <GrantsTable
@@ -185,16 +193,17 @@ export default function App() {
             priceUSD={priceUSD}
             rate={rate}
             marginalRate={mRate}
+            cgRate={cgRate}
             onEditFmv={handleEditFmv}
           />
         </Section>
 
         <Section title="אופציות (NQ)">
-          <OptionsTable options={parsed.options} priceUSD={priceUSD} rate={rate} />
+          <OptionsTable options={parsed.options} priceUSD={priceUSD} rate={rate} cgRate={cgRate} />
         </Section>
 
         <Section title="ESPP">
-          <EsppTable espp={parsed.espp} priceUSD={priceUSD} rate={rate} marginalRate={mRate} />
+          <EsppTable espp={parsed.espp} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
         </Section>
 
         <footer className="pt-8 pb-4 text-center text-xs text-surface-400 dark:text-surface-600">

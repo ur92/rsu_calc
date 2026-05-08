@@ -15,23 +15,16 @@ interface Props {
   priceUSD: number;
   rate: number;
   marginalRate: number;
-}
-
-interface AvailRow {
-  label: string;
-  track: 'הוני' | 'רגיל';
-  shares: number;
-  grossILS: number;
-  netILS: number;
+  cgRate: number;
 }
 
 const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#64748b'];
 
-export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }: Props) {
+export default function PortfolioOverview({ data, priceUSD, rate, marginalRate, cgRate }: Props) {
   const today = new Date();
   const horizon = addMonths(today, 12);
 
-  const { availRows, availTotal, vestTotal, futureNet, futureGross, futureShares, quarterlyData } = useMemo(() => {
+  const { availTotal, vestTotal, futureNet, futureGross, futureShares, quarterlyData } = useMemo(() => {
     // ── Available now (blocked shares / exercisable options) ──────────────
     let optShares = 0, optGross = 0, optNet = 0;
     let rsuCapShares = 0, rsuCapGross = 0, rsuCapNet = 0;
@@ -44,13 +37,13 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }
       if (qty <= 0 || priceUSD <= o.exercisePrice) continue;
       optShares += qty;
       optGross += qty * priceUSD * rate;
-      optNet += qty * optionNetPerShare(o.exercisePrice, priceUSD) * rate;
+      optNet += qty * optionNetPerShare(o.exercisePrice, priceUSD, cgRate) * rate;
     }
 
     for (const g of data.rsus) {
       if (g.blockedQty <= 0) continue;
       const cap = isCapitalTrack(g.grantDate);
-      const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cap);
+      const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cgRate, cap);
       if (cap) {
         rsuCapShares += g.blockedQty;
         rsuCapGross += g.blockedQty * priceUSD * rate;
@@ -65,7 +58,7 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }
     for (const e of data.espp) {
       if (e.blockedQty <= 0) continue;
       const cap = isCapitalTrack(e.grantDate);
-      const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cap);
+      const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cgRate, cap);
       if (cap) {
         esppCapShares += e.blockedQty;
         esppCapGross += e.blockedQty * priceUSD * rate;
@@ -77,18 +70,10 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }
       }
     }
 
-    const rows: AvailRow[] = [
-      optShares > 0    && { label: 'אופציות', track: 'הוני' as const, shares: optShares,    grossILS: optGross,    netILS: optNet },
-      rsuCapShares > 0 && { label: 'RSU הוני', track: 'הוני' as const, shares: rsuCapShares, grossILS: rsuCapGross, netILS: rsuCapNet },
-      rsuOrdShares > 0 && { label: 'RSU רגיל', track: 'רגיל' as const, shares: rsuOrdShares, grossILS: rsuOrdGross, netILS: rsuOrdNet },
-      esppCapShares > 0 && { label: 'ESPP הוני', track: 'הוני' as const, shares: esppCapShares, grossILS: esppCapGross, netILS: esppCapNet },
-      esppOrdShares > 0 && { label: 'ESPP רגיל', track: 'רגיל' as const, shares: esppOrdShares, grossILS: esppOrdGross, netILS: esppOrdNet },
-    ].filter(Boolean) as AvailRow[];
-
     const availTotal = {
-      shares: rows.reduce((s, r) => s + r.shares, 0),
-      grossILS: rows.reduce((s, r) => s + r.grossILS, 0),
-      netILS: rows.reduce((s, r) => s + r.netILS, 0),
+      shares: optShares + rsuCapShares + rsuOrdShares + esppCapShares + esppOrdShares,
+      grossILS: optGross + rsuCapGross + rsuOrdGross + esppCapGross + esppOrdGross,
+      netILS: optNet + rsuCapNet + rsuOrdNet + esppCapNet + esppOrdNet,
     };
 
     // ── Vesting next 12 months + future ───────────────────────────────────
@@ -97,22 +82,24 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }
     let futureNetTotal = 0, futureGrossTotal = 0, futureSharesTotal = 0;
 
     for (const g of data.rsus) {
-      const cap = isCapitalTrack(g.grantDate);
-      const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cap);
       for (const v of g.vestSchedule) {
         if (v.qty <= 0 || !isAfter(v.vestDate, today)) continue;
+        const cap = isCapitalTrack(g.grantDate, v.vestDate);
+        const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cgRate, cap);
         const grossILS = v.qty * priceUSD * rate;
         const netILS = v.qty * net * rate;
+
+        const q = getQuarter(v.vestDate);
+        const yr = getYear(v.vestDate);
+        const key = `${yr}-Q${q}`;
+        const cur = quarterMap.get(key) ?? { label: `Q${q} ${yr % 100}`, netILS: 0 };
+        cur.netILS += netILS;
+        quarterMap.set(key, cur);
+
         if (!isAfter(v.vestDate, horizon)) {
           vestNetTotal += netILS;
           vestGrossTotal += grossILS;
           vestSharesTotal += v.qty;
-          const q = getQuarter(v.vestDate);
-          const yr = getYear(v.vestDate);
-          const key = `${yr}-Q${q}`;
-          const cur = quarterMap.get(key) ?? { label: `Q${q} ${yr}`, netILS: 0 };
-          cur.netILS += netILS;
-          quarterMap.set(key, cur);
         } else {
           futureNetTotal += netILS;
           futureGrossTotal += grossILS;
@@ -130,7 +117,6 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }
       });
 
     return {
-      availRows: rows,
       availTotal,
       vestTotal: { netILS: vestNetTotal, grossILS: vestGrossTotal, shares: vestSharesTotal },
       futureNet: futureNetTotal,
@@ -138,18 +124,17 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }
       futureShares: futureSharesTotal,
       quarterlyData,
     };
-  }, [data, priceUSD, rate, marginalRate]);
+  }, [data, priceUSD, rate, marginalRate, cgRate, today, horizon]);
 
   const pieData = [
     { name: 'זמין עכשיו', value: Math.round(availTotal.netILS) },
-    { name: 'מבשיל 12 חודשים', value: Math.round(vestTotal.netILS) },
-    { name: 'טרם הבשלה', value: Math.round(futureNet) },
+    { name: 'יבשיל בעתיד', value: Math.round(vestTotal.netILS + futureNet) },
   ].filter((d) => d.value > 0);
 
   return (
     <div className="space-y-5">
       {/* Stat cards */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-4">
         <StatCard
           label="זמין עכשיו למכירה"
           net={availTotal.netILS}
@@ -158,26 +143,11 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }
           color="blue"
         />
         <StatCard
-          label="יבשיל ב-12 חודשים הקרובים"
-          net={vestTotal.netILS}
-          gross={vestTotal.grossILS}
-          shares={vestTotal.shares}
+          label="יבשיל בעתיד"
+          net={vestTotal.netILS + futureNet}
+          gross={vestTotal.grossILS + futureGross}
+          shares={vestTotal.shares + futureShares}
           color="purple"
-        />
-        <StatCard
-          label='סה"כ (זמין + הבשלות קרובות)'
-          net={availTotal.netILS + vestTotal.netILS}
-          gross={availTotal.grossILS + vestTotal.grossILS}
-          shares={availTotal.shares + vestTotal.shares}
-          color="green"
-          highlight
-        />
-        <StatCard
-          label="עתיד לבשל (מעבר ל-12 חודשים)"
-          net={futureNet}
-          gross={futureGross}
-          shares={futureShares}
-          color="gray"
         />
       </div>
 
@@ -207,9 +177,9 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }
         </div>
 
         <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
-          <h3 className="font-semibold text-surface-800 dark:text-surface-200 mb-4">הבשלות לפי רבעון</h3>
+          <h3 className="font-semibold text-surface-800 dark:text-surface-200 mb-4">הבשלות עתידיות לפי רבעון</h3>
           {quarterlyData.length === 0 ? (
-            <p className="text-sm text-surface-500 pt-8 text-center">אין הבשלות ב-12 החודשים הקרובים</p>
+            <p className="text-sm text-surface-500 pt-8 text-center">אין הבשלות עתידיות</p>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={quarterlyData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
@@ -226,50 +196,6 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate }
         </div>
       </div>
 
-      {/* Available now breakdown table */}
-      <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-hidden">
-        <div className="px-5 py-4 border-b border-surface-100 dark:border-surface-800">
-          <h3 className="font-semibold text-surface-800 dark:text-surface-200">מניות זמינות עכשיו</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-50 dark:bg-surface-800/50">
-              <tr>
-                <th className="py-3 px-4 text-right font-semibold text-surface-600 dark:text-surface-400 text-xs">מקור</th>
-                <th className="py-3 px-4 text-right font-semibold text-surface-600 dark:text-surface-400 text-xs">מסלול</th>
-                <th className="py-3 px-4 text-right font-semibold text-surface-600 dark:text-surface-400 text-xs">מניות</th>
-                <th className="py-3 px-4 text-right font-semibold text-surface-600 dark:text-surface-400 text-xs">ברוטו</th>
-                <th className="py-3 px-4 text-right font-semibold text-surface-600 dark:text-surface-400 text-xs">נטו</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-100 dark:divide-surface-800">
-              {availRows.map((row) => (
-                <tr key={row.label} className="hover:bg-surface-50 dark:hover:bg-surface-800/30">
-                  <td className="py-3 px-4 font-medium text-surface-800 dark:text-surface-200">{row.label}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-0.5 text-xs rounded font-medium ${
-                      row.track === 'הוני'
-                        ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
-                    }`}>
-                      {row.track}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">{row.shares.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-surface-600 dark:text-surface-400">{formatILS(row.grossILS)}</td>
-                  <td className="py-3 px-4 font-bold">{formatILS(row.netILS)}</td>
-                </tr>
-              ))}
-              <tr className="font-bold border-t-2 border-surface-300 dark:border-surface-600 bg-surface-50 dark:bg-surface-800/30">
-                <td className="py-3 px-4" colSpan={2}>סה"כ</td>
-                <td className="py-3 px-4">{availTotal.shares.toLocaleString()}</td>
-                <td className="py-3 px-4 text-surface-600 dark:text-surface-400">{formatILS(availTotal.grossILS)}</td>
-                <td className="py-3 px-4">{formatILS(availTotal.netILS)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

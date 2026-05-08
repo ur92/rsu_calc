@@ -7,9 +7,10 @@ interface Props {
   priceUSD: number;
   rate: number;
   marginalRate: number;
+  cgRate: number;
 }
 
-export default function EsppTable({ espp, priceUSD, rate, marginalRate }: Props) {
+export default function EsppTable({ espp, priceUSD, rate, marginalRate, cgRate }: Props) {
   const sorted = [...espp].sort((a, b) => a.purchaseDate.getTime() - b.purchaseDate.getTime());
 
   if (sorted.length === 0) {
@@ -36,8 +37,8 @@ export default function EsppTable({ espp, priceUSD, rate, marginalRate }: Props)
         <tbody className="divide-y divide-surface-100 dark:divide-surface-800">
           {sorted.map((e, i) => {
             const cap = isCapitalTrack(e.grantDate);
-            const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cap);
-            const effRate = esppEffectiveTaxRate(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cap);
+            const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cgRate, cap);
+            const effRate = esppEffectiveTaxRate(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cgRate, cap);
             const totalNet = e.blockedQty * net * rate;
             return (
               <tr key={i} className="hover:bg-surface-50 dark:hover:bg-surface-800/30">

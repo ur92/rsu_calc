@@ -6,9 +6,10 @@ interface Props {
   options: OptionGrant[];
   priceUSD: number;
   rate: number;
+  cgRate: number;
 }
 
-export default function OptionsTable({ options, priceUSD, rate }: Props) {
+export default function OptionsTable({ options, priceUSD, rate, cgRate }: Props) {
   const sorted = [...options].sort((a, b) => a.grantDate.getTime() - b.grantDate.getTime());
 
   if (sorted.length === 0) {
@@ -34,8 +35,8 @@ export default function OptionsTable({ options, priceUSD, rate }: Props) {
         <tbody className="divide-y divide-surface-100 dark:divide-surface-800">
           {sorted.map((o) => {
             const underwater = priceUSD <= o.exercisePrice;
-            const net = optionNetPerShare(o.exercisePrice, priceUSD);
-            const effRate = optionEffectiveTaxRate(o.exercisePrice, priceUSD);
+            const net = optionNetPerShare(o.exercisePrice, priceUSD, cgRate);
+            const effRate = optionEffectiveTaxRate(o.exercisePrice, priceUSD, cgRate);
             const totalNet = o.exercisableQty * net * rate;
             return (
               <tr key={o.grantNumber} className="hover:bg-surface-50 dark:hover:bg-surface-800/30">

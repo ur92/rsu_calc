@@ -24,10 +24,12 @@ This skill turns a raw eTrade export into a tax-aware equity dashboard for Israe
    It prints JSON with `rsus`, `options`, `espp` arrays. Each RSU grant includes `vestSchedule[]` with future vest events and a heuristic `fmvAtGrant` taken from the first vest's `Released Amount`.
 
 2. Apply the tax rules in [tax-rules.md](tax-rules.md) to compute, for each grant:
-   - Whether it is on the capital track (24+ months from grant date) or ordinary track
+   - Whether it is on the capital track or ordinary track via `holding_track(grant_date, sale_date)` (24-month clock measured from the **end of the tax year of grant**, not the calendar grant date)
    - Net per share at the user's price + rate
    - Effective tax rate
    - Total net ILS for blocked/exercisable shares
+
+   The four Section 102 tracks (102 הוני / 102 פירותי / 102 ללא נאמן / 3(i)) and the choice between them are summarized in [tax-rules.md](tax-rules.md). Track is set by the company, not the employee.
 
 3. Produce a Cursor canvas at the workspace's `canvases/` directory. Filename: `jfrog-equity-<YYYY-MM-DD>.canvas.tsx`. The canvas must:
    - Inline all parsed data and computed values (no fetch, no network)
@@ -57,16 +59,20 @@ Stack
 
 ## Tax rules summary
 
-Full reference in [tax-rules.md](tax-rules.md). Key formulas:
+Full reference in [tax-rules.md](tax-rules.md), tested implementation in [tax_calc.py](tax_calc.py). Key formulas:
 
 | Type | Formula |
 |---|---|
-| RSU הוני (24+ months) | `net = price - fmv_grant × marginal - max(0, price - fmv_grant) × 0.28` |
-| RSU רגיל (<24 months) | `net = price × (1 - marginal)` |
-| Options NQ pre-IPO | `net = max(0, price - strike) × 0.72` |
-| ESPP | `net = price - max(0, fmv_purchase - purchase_price) × marginal - max(0, price - fmv_purchase) × 0.28` |
+| RSU הוני (capital track, `price ≥ fmv_grant`) | `net = price - fmv_grant × marginal - (price - fmv_grant) × cg_rate` |
+| RSU הוני (capital track, `price < fmv_grant`) | `net = price × (1 - marginal)` — sell-below-FMV cap |
+| RSU רגיל (ordinary track) | `net = price × (1 - marginal)` |
+| Options NQ pre-IPO | `net = max(0, price - strike) × (1 - cg_rate)` |
+| ESPP (`price ≥ fmv_purchase`) | `net = price - (fmv_purchase - purchase_price) × marginal - (price - fmv_purchase) × cg_rate` |
+| ESPP (`price < fmv_purchase`) | `net = price - max(0, price - purchase_price) × marginal` — sell-below-FMV cap |
 
-Marginal rate by annual NIS salary:
+`cg_rate = 0.30` above the 721,560 ₪/year surtax threshold or for controlling shareholders; `0.25` otherwise.
+
+Marginal rate quick lookup by annual NIS salary (use [tax-rules.md](tax-rules.md) and `marginal_tax_on()` in [tax_calc.py](tax_calc.py) for precise 2026 brackets):
 - < 350,000 → 40%
 - 350,000–700,000 → 41%
 - ≥ 700,000 → 53%
@@ -80,3 +86,19 @@ Ask the user to provide actual grant FMVs if accuracy matters, or note this limi
 ## Sale priority rule
 
 Sort all sellable lots (blocked RSU, exercisable options, blocked ESPP) by effective tax rate ascending. The lowest tax rate is the most efficient to sell first.
+
+## Tests
+
+The formulas, brackets, and surtax constants are pinned by a deterministic stdlib `unittest` suite. Run from the workspace root:
+
+```bash
+python3 -m unittest .cursor/skills/jfrog-equity-analyzer/test_tax_calc.py -v
+```
+
+Or from the skill directory:
+
+```bash
+python3 -m unittest test_tax_calc -v
+```
+
+Sentinel assertions guard the values that have shifted historically (`CAPITAL_GAINS_RATE_HIGH = 0.30`, `SURTAX_THRESHOLD = 721_560`, `BL_MONTHLY_CEILING = 51_910`, eTrade trustee withholding 62%/28%). If any of these drift, the relevant test fails and the change must be reflected in both `tax_calc.py` and `tax-rules.md` together.

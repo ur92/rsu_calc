@@ -11,6 +11,7 @@ interface Props {
   priceUSD: number;
   rate: number;
   marginalRate: number;
+  cgRate: number;
 }
 
 interface UpcomingVest {
@@ -23,14 +24,14 @@ interface UpcomingVest {
   netILS: number;
 }
 
-export default function VestingSchedule({ data, priceUSD, rate, marginalRate }: Props) {
+export default function VestingSchedule({ data, priceUSD, rate, marginalRate, cgRate }: Props) {
   const today = new Date();
   const horizon = addMonths(today, 12);
 
   const events: UpcomingVest[] = [];
   for (const g of data.rsus) {
     const cap = isCapitalTrack(g.grantDate);
-    const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cap);
+    const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cgRate, cap);
     for (const v of g.vestSchedule) {
       if (v.qty <= 0) continue;
       if (!isAfter(v.vestDate, today)) continue;

@@ -3,14 +3,18 @@ import {
   isCapitalTrack, rsuNetPerShare, rsuEffectiveTaxRate,
   optionNetPerShare, optionEffectiveTaxRate,
   esppNetPerShare, esppEffectiveTaxRate,
+  rsuTaxBreakdown, optionTaxBreakdown, esppTaxBreakdown,
+  type TaxBreakdown,
 } from '../lib/taxCalc';
 import { formatILS } from '../lib/format';
+import TaxBreakdownTooltip from './TaxBreakdownTooltip';
 
 interface Props {
   data: ParsedData;
   priceUSD: number;
   rate: number;
   marginalRate: number;
+  cgRate: number;
 }
 
 interface Item {
@@ -23,15 +27,16 @@ interface Item {
   grossILS: number;
   netILS: number;
   taxILS: number;
+  breakdown: TaxBreakdown;
 }
 
-export default function SalePriority({ data, priceUSD, rate, marginalRate }: Props) {
+export default function SalePriority({ data, priceUSD, rate, marginalRate, cgRate }: Props) {
   const items: Item[] = [];
 
   for (const g of data.rsus) {
     if (g.blockedQty <= 0) continue;
     const cap = isCapitalTrack(g.grantDate);
-    const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cap);
+    const net = rsuNetPerShare(g.fmvAtGrant, priceUSD, marginalRate, cgRate, cap);
     const grossILS = priceUSD * g.blockedQty * rate;
     const netILS = net * g.blockedQty * rate;
     items.push({
@@ -40,16 +45,17 @@ export default function SalePriority({ data, priceUSD, rate, marginalRate }: Pro
       type: cap ? 'RSU הוני' : 'RSU רגיל',
       shares: g.blockedQty,
       netPerShare: net,
-      effectiveTaxRate: rsuEffectiveTaxRate(g.fmvAtGrant, priceUSD, marginalRate, cap),
+      effectiveTaxRate: rsuEffectiveTaxRate(g.fmvAtGrant, priceUSD, marginalRate, cgRate, cap),
       grossILS,
       netILS,
       taxILS: grossILS - netILS,
+      breakdown: rsuTaxBreakdown(g.fmvAtGrant, priceUSD, marginalRate, cgRate, cap, g.blockedQty, rate),
     });
   }
 
   for (const o of data.options) {
     if (o.exercisableQty <= 0 || priceUSD <= o.exercisePrice) continue;
-    const net = optionNetPerShare(o.exercisePrice, priceUSD);
+    const net = optionNetPerShare(o.exercisePrice, priceUSD, cgRate);
     // For options, gross = spread (sale - strike) since strike is the cost basis paid on exercise.
     const grossILS = (priceUSD - o.exercisePrice) * o.exercisableQty * rate;
     const netILS = net * o.exercisableQty * rate;
@@ -59,17 +65,18 @@ export default function SalePriority({ data, priceUSD, rate, marginalRate }: Pro
       type: 'אופציות',
       shares: o.exercisableQty,
       netPerShare: net,
-      effectiveTaxRate: optionEffectiveTaxRate(o.exercisePrice, priceUSD),
+      effectiveTaxRate: optionEffectiveTaxRate(o.exercisePrice, priceUSD, cgRate),
       grossILS,
       netILS,
       taxILS: grossILS - netILS,
+      breakdown: optionTaxBreakdown(o.exercisePrice, priceUSD, cgRate, o.exercisableQty, rate),
     });
   }
 
   for (const e of data.espp) {
     if (e.blockedQty <= 0) continue;
     const cap = isCapitalTrack(e.grantDate);
-    const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cap);
+    const net = esppNetPerShare(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cgRate, cap);
     const grossILS = priceUSD * e.blockedQty * rate;
     const netILS = net * e.blockedQty * rate;
     items.push({
@@ -78,10 +85,11 @@ export default function SalePriority({ data, priceUSD, rate, marginalRate }: Pro
       type: 'ESPP',
       shares: e.blockedQty,
       netPerShare: net,
-      effectiveTaxRate: esppEffectiveTaxRate(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cap),
+      effectiveTaxRate: esppEffectiveTaxRate(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cgRate, cap),
       grossILS,
       netILS,
       taxILS: grossILS - netILS,
+      breakdown: esppTaxBreakdown(e.purchasePrice, e.purchaseDateFmv, priceUSD, marginalRate, cgRate, cap, e.blockedQty, rate),
     });
   }
 
@@ -119,8 +127,9 @@ export default function SalePriority({ data, priceUSD, rate, marginalRate }: Pro
               <p className="text-xs text-surface-500">
                 ברוטו: {formatILS(item.grossILS)}
               </p>
-              <p className="text-xs text-rose-600 dark:text-rose-400">
-                מס: {formatILS(item.taxILS)} ({(item.effectiveTaxRate * 100).toFixed(0)}%)
+              <p className="text-xs text-rose-600 dark:text-rose-400 inline-flex items-center gap-1 justify-end">
+                <TaxBreakdownTooltip breakdown={item.breakdown} />
+                <span>מס: {formatILS(item.taxILS)} ({(item.effectiveTaxRate * 100).toFixed(0)}%)</span>
               </p>
             </div>
           </div>
