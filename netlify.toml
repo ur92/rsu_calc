@@ -2,10 +2,15 @@
 #
 # Cost model:
 #   - Deploy previews (PR-triggered): FREE and unlimited
-#   - Production deploys (main branch): consume credits
-#   - Branch deploys (non-PR push): DISABLED below to save credits
+#   - Production deploys (main branch): DISABLED — manual CLI deploys only
+#   - Branch deploys (non-PR push): DISABLED to save credits
 #
-# Workflow: open a PR for any feature branch -> free deploy preview generated automatically.
+# Workflow:
+#   - Open a PR for any feature branch -> free deploy preview generated automatically.
+#   - Production deploys are triggered manually from CLI:
+#       cd app && npm run build
+#       npx netlify deploy --prod --dir=dist
+#     (auth via NETLIFY_AUTH_TOKEN or `npx netlify login`)
 
 [build]
   command = "cd app && npm install && npm run build"
@@ -18,6 +23,11 @@
   command = "cd app && npm install && npm run build"
 
 [context.branch-deploy]
+  ignore = "exit 0"
+
+# Skip Git-triggered production builds. Manual `netlify deploy --prod` from
+# the CLI bypasses this because it uploads pre-built artifacts directly.
+[context.production]
   ignore = "exit 0"
 
 [[edge_functions]]
