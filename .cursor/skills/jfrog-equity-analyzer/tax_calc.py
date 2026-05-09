@@ -10,8 +10,9 @@ brackets and ceilings.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
-from typing import Literal
+from typing import Literal, TypedDict
 
 Track = Literal["capital", "ordinary"]
 
@@ -67,19 +68,88 @@ def marginal_tax_on(annual_income_nis: float) -> float:
 
 
 def capital_gains_rate(
-    annual_income_nis: float,
+    _annual_income_nis: float,
     controlling_shareholder: bool = False,
 ) -> float:
     """Effective capital-gains rate for a Section 102 honi sale.
 
-    25% by default, 30% above the surtax threshold or for controlling
-    shareholders (10%+ holdings ever).
+    25% by default, 30% only for controlling shareholders (10%+ holdings ever).
+    Portfolio-level מס יסף (3% + 2% since 2025) is computed separately via
+    `compute_surtax`.
     """
     if controlling_shareholder:
         return CAPITAL_GAINS_RATE_HIGH
-    if annual_income_nis > SURTAX_THRESHOLD:
-        return CAPITAL_GAINS_RATE_HIGH
     return CAPITAL_GAINS_RATE_BASE
+
+
+@dataclass(frozen=True)
+class SurtaxResult:
+    total_income_nis: float
+    capital_income_total_nis: float
+    yasaf3_nis: float
+    yasaf2_nis: float
+    total_nis: float
+
+
+def compute_surtax(
+    salary_nis: float,
+    jfrog_sale_total_income_nis: float,
+    jfrog_sale_capital_source_nis: float,
+    other_capital_income_nis: float = 0.0,
+) -> SurtaxResult:
+    """Portfolio יסף per section 121ב (הוראת ביצוע 5/2025): 3% on total, 2% on capital."""
+    other = other_capital_income_nis
+    total_income = salary_nis + jfrog_sale_total_income_nis + other
+    capital_total = jfrog_sale_capital_source_nis + other
+    yasaf3 = SURTAX_GENERAL_RATE * max(0.0, total_income - SURTAX_THRESHOLD)
+    yasaf2 = SURTAX_CAPITAL_EXTRA_RATE * max(0.0, capital_total - SURTAX_THRESHOLD)
+    total_yasaf = yasaf3 + yasaf2
+    return SurtaxResult(
+        total_income_nis=total_income,
+        capital_income_total_nis=capital_total,
+        yasaf3_nis=yasaf3,
+        yasaf2_nis=yasaf2,
+        total_nis=total_yasaf,
+    )
+
+
+class LotIncomeBreakdown(TypedDict):
+    total_income_nis: float
+    capital_income_nis: float
+
+
+def rsu_lot_income(
+    fmv_at_grant: float,
+    sale_price: float,
+    qty: float,
+    fx: float,
+    capital_track: bool,
+) -> LotIncomeBreakdown:
+    del fmv_at_grant
+    total_income = sale_price * qty * fx
+    cap = total_income if capital_track else 0.0
+    return LotIncomeBreakdown(total_income_nis=total_income, capital_income_nis=cap)
+
+
+def option_lot_income(
+    strike: float, sale_price: float, qty: float, fx: float
+) -> LotIncomeBreakdown:
+    spread = max(0.0, sale_price - strike)
+    v = spread * qty * fx
+    return LotIncomeBreakdown(total_income_nis=v, capital_income_nis=v)
+
+
+def espp_lot_income(
+    purchase_date_fmv: float,
+    sale_price: float,
+    qty: float,
+    fx: float,
+    capital_track: bool,
+) -> LotIncomeBreakdown:
+    del purchase_date_fmv
+    total_income = sale_price * qty * fx
+    cap = total_income if capital_track else 0.0
+    return LotIncomeBreakdown(total_income_nis=total_income, capital_income_nis=cap)
 
 
 def holding_track(grant_date: date, sale_date: date) -> Track:

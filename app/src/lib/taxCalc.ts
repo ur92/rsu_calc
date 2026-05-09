@@ -20,17 +20,91 @@ export function marginalRate(annualSalaryNIS: number): number {
 
 /**
  * Effective capital-gains rate for a Section 102 honi sale.
- * 25% by default, 30% above the 721,560 ₪/year surtax threshold (3% general
- * yasaf + 2% additional capital-income yasaf since 2025) or for controlling
- * shareholders (10%+ holdings, ever).
+ * 25% by default, 30% only for controlling shareholders (10%+ holdings, ever).
+ * Portfolio-level מס יסף (3% + 2% since 2025) is computed separately via `computeSurtax`.
  */
 export function capitalGainsRate(
-  annualSalaryNIS: number,
+  _annualSalaryNIS: number,
   controllingShareholder = false,
 ): number {
   if (controllingShareholder) return CAPITAL_GAINS_RATE_HIGH;
-  if (annualSalaryNIS > SURTAX_THRESHOLD_NIS) return CAPITAL_GAINS_RATE_HIGH;
   return CAPITAL_GAINS_RATE_BASE;
+}
+
+/** Inputs for portfolio-level יסף per section 121ב (הוראת ביצוע 5/2025). */
+export interface SurtaxInput {
+  salaryNIS: number;
+  /** Gross taxable proceeds from simulated JFrog sales — all tracks (employment + capital), NIS. */
+  jfrogSaleTotalIncomeNIS: number;
+  /** Capital-source gross from JFrog sales only (capital-track 102 הוני RSU, options spread, ESPP הוני), NIS. */
+  jfrogSaleCapitalSourceNIS: number;
+  otherCapitalIncomeNIS?: number;
+}
+
+export interface SurtaxResult {
+  totalIncomeNIS: number;
+  capitalIncomeTotalNIS: number;
+  yasaf3NIS: number;
+  yasaf2NIS: number;
+  totalNIS: number;
+}
+
+const SURTAX_GENERAL_RATE = 0.03;
+const SURTAX_CAPITAL_EXTRA_RATE = 0.02;
+
+export function computeSurtax(input: SurtaxInput): SurtaxResult {
+  const other = input.otherCapitalIncomeNIS ?? 0;
+  const totalIncomeNIS = input.salaryNIS + input.jfrogSaleTotalIncomeNIS + other;
+  const capitalIncomeTotalNIS = input.jfrogSaleCapitalSourceNIS + other;
+  const yasaf3NIS = SURTAX_GENERAL_RATE * Math.max(0, totalIncomeNIS - SURTAX_THRESHOLD_NIS);
+  const yasaf2NIS = SURTAX_CAPITAL_EXTRA_RATE * Math.max(0, capitalIncomeTotalNIS - SURTAX_THRESHOLD_NIS);
+  const totalNIS = yasaf3NIS + yasaf2NIS;
+  return { totalIncomeNIS, capitalIncomeTotalNIS, yasaf3NIS, yasaf2NIS, totalNIS };
+}
+
+/** Per-lot gross buckets for יסף: total (3% base) vs capital-source (2% base, ex salary). */
+export interface LotIncomeBreakdown {
+  totalIncomeNIS: number;
+  capitalIncomeNIS: number;
+}
+
+export function rsuLotIncome(
+  _fmvAtGrant: number,
+  salePrice: number,
+  qty: number,
+  fx: number,
+  capitalTrack: boolean,
+): LotIncomeBreakdown {
+  const totalIncomeNIS = salePrice * qty * fx;
+  return {
+    totalIncomeNIS,
+    capitalIncomeNIS: capitalTrack ? totalIncomeNIS : 0,
+  };
+}
+
+export function optionLotIncome(
+  strike: number,
+  salePrice: number,
+  qty: number,
+  fx: number,
+): LotIncomeBreakdown {
+  const spread = Math.max(0, salePrice - strike);
+  const v = spread * qty * fx;
+  return { totalIncomeNIS: v, capitalIncomeNIS: v };
+}
+
+export function esppLotIncome(
+  _purchaseDateFmv: number,
+  salePrice: number,
+  qty: number,
+  fx: number,
+  capitalTrack: boolean,
+): LotIncomeBreakdown {
+  const totalIncomeNIS = salePrice * qty * fx;
+  return {
+    totalIncomeNIS,
+    capitalIncomeNIS: capitalTrack ? totalIncomeNIS : 0,
+  };
 }
 
 /**
@@ -92,10 +166,11 @@ export function optionNetPerShare(strike: number, salePrice: number, cgRate: num
 }
 
 export function optionEffectiveTaxRate(strike: number, salePrice: number, cgRate: number): number {
-  if (salePrice <= 0) return 0;
-  if (salePrice <= strike) return 1;
-  const net = optionNetPerShare(strike, salePrice, cgRate);
-  return 1 - net / salePrice;
+  const spread = salePrice - strike;
+  if (spread <= 0) return 0;
+  // Tax is cgRate% of the spread only — the strike is the cost basis paid out-of-pocket.
+  // Effective rate is always cgRate relative to the gross profit (spread).
+  return cgRate;
 }
 
 /**
@@ -144,6 +219,8 @@ export interface TaxBreakdown {
   title: string;
   lines: string[];
   note?: string;
+  /** Marginal portfolio יסף attributable to this lot, if shown in the tooltip. */
+  surtaxLine?: string;
 }
 
 const fmtILS0 = new Intl.NumberFormat('he-IL', { maximumFractionDigits: 0 });

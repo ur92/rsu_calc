@@ -36,6 +36,11 @@ export default function TaxBreakdownTooltip({ breakdown }: Props) {
             {breakdown.note}
           </span>
         ) : null}
+        {breakdown.surtaxLine ? (
+          <span className="block mt-1.5 text-[10px] leading-4 text-amber-700 dark:text-amber-400 font-medium">
+            {breakdown.surtaxLine}
+          </span>
+        ) : null}
       </span>
     </span>
   );

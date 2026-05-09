@@ -2,20 +2,31 @@
 
 Run from the workspace root:
 
-    python3 -m unittest .cursor/skills/jfrog-equity-analyzer/test_tax_calc.py -v
+    python3 -m unittest discover -s .cursor/skills/jfrog-equity-analyzer -p test_tax_calc.py -v
 
-Or, from the skill directory:
+Or from the skill directory:
 
-    python3 -m unittest test_tax_calc -v
+    python3 -m unittest test_tax_calc.py -v
 
 These tests pin every formula, bracket boundary, and surtax constant
 defined in tax-rules.md / tax_calc.py. Any drift fails loudly with a
 clear delta so the change can be reviewed before propagating.
+
+Runnable from repo root:
+
+    PYTHONPATH=.cursor/skills/jfrog-equity-analyzer python3 -m unittest \\
+        discover -s .cursor/skills/jfrog-equity-analyzer -p test_tax_calc.py -v
 """
 from __future__ import annotations
 
+import sys
 import unittest
 from datetime import date
+from pathlib import Path
+
+_skill_dir = Path(__file__).resolve().parent
+if str(_skill_dir) not in sys.path:
+    sys.path.insert(0, str(_skill_dir))
 
 import tax_calc as tc
 
@@ -59,7 +70,7 @@ class TestCapitalGainsRate(unittest.TestCase):
         self.assertEqual(tc.capital_gains_rate(500_000), 0.25)
 
     def test_above_threshold_not_controlling(self) -> None:
-        self.assertEqual(tc.capital_gains_rate(721_561), 0.30)
+        self.assertEqual(tc.capital_gains_rate(721_561), 0.25)
 
     def test_at_threshold_is_base(self) -> None:
         self.assertEqual(tc.capital_gains_rate(721_560), 0.25)
@@ -160,6 +171,79 @@ class TestOptionsNetPerShare(unittest.TestCase):
     def test_at_the_money(self) -> None:
         self.assertEqual(
             tc.options_net_per_share(price=10, strike=10, cg_rate=0.25), 0.0
+        )
+
+
+class TestComputeSurtax(unittest.TestCase):
+    """הוראת ביצוע 5/2025 — דוגמאות 3.1–3.3 (משכורת + דיבידנד + ריבית כ-other)."""
+
+    def test_example_3_1_below_threshold(self) -> None:
+        r = tc.compute_surtax(
+            salary_nis=400_000,
+            jfrog_sale_total_income_nis=0,
+            jfrog_sale_capital_source_nis=0,
+            other_capital_income_nis=300_000,
+        )
+        self.assertAlmostEqual(r.total_income_nis, 700_000, places=4)
+        self.assertAlmostEqual(r.capital_income_total_nis, 300_000, places=4)
+        self.assertAlmostEqual(r.yasaf3_nis, 0.0, places=2)
+        self.assertAlmostEqual(r.yasaf2_nis, 0.0, places=2)
+        self.assertAlmostEqual(r.total_nis, 0.0, places=2)
+
+    def test_example_3_2_only_general_yasaf(self) -> None:
+        r = tc.compute_surtax(
+            salary_nis=400_000,
+            jfrog_sale_total_income_nis=0,
+            jfrog_sale_capital_source_nis=0,
+            other_capital_income_nis=700_000,
+        )
+        self.assertAlmostEqual(r.total_income_nis, 1_100_000, places=4)
+        self.assertAlmostEqual(r.capital_income_total_nis, 700_000, places=4)
+        exp3 = tc.SURTAX_GENERAL_RATE * (1_100_000 - tc.SURTAX_THRESHOLD)
+        self.assertAlmostEqual(r.yasaf3_nis, exp3, places=2)
+        self.assertAlmostEqual(r.yasaf3_nis, 11_353.20, places=2)
+        self.assertAlmostEqual(r.yasaf2_nis, 0.0, places=2)
+        self.assertAlmostEqual(r.total_nis, 11_353.20, places=2)
+
+    def test_example_3_3_both_surtax_components(self) -> None:
+        r = tc.compute_surtax(
+            salary_nis=400_000,
+            jfrog_sale_total_income_nis=0,
+            jfrog_sale_capital_source_nis=0,
+            other_capital_income_nis=1_100_000,
+        )
+        self.assertAlmostEqual(r.total_income_nis, 1_500_000, places=4)
+        self.assertAlmostEqual(r.capital_income_total_nis, 1_100_000, places=4)
+        exp3 = tc.SURTAX_GENERAL_RATE * (1_500_000 - tc.SURTAX_THRESHOLD)
+        exp2 = tc.SURTAX_CAPITAL_EXTRA_RATE * (1_100_000 - tc.SURTAX_THRESHOLD)
+        self.assertAlmostEqual(r.yasaf3_nis, exp3, places=2)
+        self.assertAlmostEqual(r.yasaf3_nis, 23_353.20, places=2)
+        self.assertAlmostEqual(r.yasaf2_nis, exp2, places=2)
+        self.assertAlmostEqual(r.yasaf2_nis, 7_568.80, places=2)
+        self.assertAlmostEqual(r.total_nis, 30_922.0, places=2)
+
+    def test_total_exactly_at_threshold(self) -> None:
+        r = tc.compute_surtax(
+            salary_nis=tc.SURTAX_THRESHOLD,
+            jfrog_sale_total_income_nis=0,
+            jfrog_sale_capital_source_nis=0,
+            other_capital_income_nis=0,
+        )
+        self.assertAlmostEqual(r.yasaf3_nis, 0.0, places=6)
+        self.assertAlmostEqual(r.yasaf2_nis, 0.0, places=6)
+
+    def test_capital_exactly_at_threshold(self) -> None:
+        r = tc.compute_surtax(
+            salary_nis=0,
+            jfrog_sale_total_income_nis=0,
+            jfrog_sale_capital_source_nis=0,
+            other_capital_income_nis=tc.SURTAX_THRESHOLD,
+        )
+        self.assertAlmostEqual(r.yasaf2_nis, 0.0, places=6)
+
+    def test_controlling_shareholder_cg_rate_unchanged(self) -> None:
+        self.assertEqual(
+            tc.capital_gains_rate(100_000, controlling_shareholder=True), 0.30
         )
 
 

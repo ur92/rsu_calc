@@ -119,6 +119,7 @@ export default function App() {
           <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6 space-y-5">
             <FileUpload onFile={setFile} fileName={file?.name} />
             <SalaryInput
+              inline
               value={salary}
               onChange={setSalary}
               marginalRate={mRate}
@@ -195,24 +196,23 @@ export default function App() {
         <PriceSimulator
           priceUSD={priceUSD}
           onPriceChange={(v) => setPriceOverride(v)}
+          onResetPrice={() => setPriceOverride(null)}
           rate={rate}
           onRateChange={(v) => setRateOverride(v)}
+          onResetRate={() => setRateOverride(null)}
           isLive={isLive && priceOverride === null}
           isLoading={isLoading}
           isRateLive={rateIsLive && rateOverride === null}
           isRateLoading={rateIsLoading}
         />
 
-        <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
-          <h3 className="font-semibold text-surface-800 dark:text-surface-200 mb-3">שכר ומקורות הכנסה</h3>
-          <SalaryInput
-            value={salary}
-            onChange={setSalary}
-            marginalRate={mRate}
-            otherCapitalIncomeNIS={otherCapitalIncomeNIS}
-            onOtherCapitalIncomeChange={setOtherCapitalIncomeNIS}
-          />
-        </div>
+        <SalaryInput
+          value={salary}
+          onChange={setSalary}
+          marginalRate={mRate}
+          otherCapitalIncomeNIS={otherCapitalIncomeNIS}
+          onOtherCapitalIncomeChange={setOtherCapitalIncomeNIS}
+        />
 
         <PortfolioOverview
           data={parsed}
@@ -221,7 +221,6 @@ export default function App() {
           marginalRate={mRate}
           cgRate={cgRate}
           salaryNIS={salary}
-          salePlan={salePlan}
           otherCapitalIncomeNIS={otherCapitalIncomeNIS}
         />
 

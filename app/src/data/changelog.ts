@@ -8,6 +8,12 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    "id": "8afef4b",
+    "date": "2026-05-09",
+    "message": "add \"מה חדש\" dropdown to header with changelog tracking",
+    "type": "feature"
+  },
+  {
     "id": "pending",
     "date": "2026-05-09",
     "message": "הוספת חישוב מס יסף 3% + 2% (תיקון 276 / הוראת ביצוע 5/2025), סימולטור כמויות מכירה לפי lot, ושדה הכנסה הונית אחרת",

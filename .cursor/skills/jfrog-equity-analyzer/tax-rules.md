@@ -17,14 +17,13 @@ Section 102 of the Israeli Income Tax Ordinance defines four possible treatments
 
 ## Capital gains rate (102 הוני)
 
-The 25% flat rate has two surcharges:
+The statutory flat rate on the **capital-gain portion** of a 102 honi sale is **25%**, or **30%** only for **controlling shareholders** (10%+ holdings, ever).
 
-- **Surtax (יסף) on annual income above 721,560 ₪ (2026 threshold)** — 3% general yasaf + 2% additional yasaf on capital income, since 2025. Combined rate on capital gains above the threshold = **30%**.
-- **Controlling shareholder (10%+ holdings, ever)** — 30% flat regardless of income level.
+**מס יסף** (additional tax under section 121ב, including the 3% general and 2% capital surtax since 2025) is **not** included in `cg_rate`. It is computed **at portfolio level** on annual taxable income (salary + simulated sales + other capital income) — see `compute_surtax` / `computeSurtax` in the implementations.
 
 ```
-cg_rate = 0.25                                  # below threshold, not controlling
-cg_rate = 0.30                                  # above 721,560 ₪/year, OR controlling shareholder
+cg_rate = 0.25                                  # default
+cg_rate = 0.30                                  # controlling shareholder only
 ```
 
 ## Per-share net formulas
@@ -75,6 +74,36 @@ else:
     discount = max(0, price - purchase_price)
     net = price - discount * marginal
 ```
+
+## מס יסף לפי סעיף 121ב (תיקון 276 + הוראת ביצוע 5/2025)
+
+כללים אלה משקפים את **מס היסף הנוסף** ברמת **שנת מס**, מעבר לשיעורי מס ההכנסה השגרתיים. החישוב ביישום (`compute_surtax` / `computeSurtax`) הוא **ברמת התיק** (משכורת + סימולציית מכירות + הכנסה הונית אחרת), לא per-lot.
+
+### סף
+
+- **721,560 ₪** לשנת מס — **קפוא לשנים 2025–2027** במקורות הרשמיים לעניין יסף זה.
+
+### שני מרכיבים (בסכומים עודפים מעל הסף — כל אחד בנפרד)
+
+1. **3%** על **סך ההכנסה החייבת** (כולל משכורת, הכנסות ממכירת ניירות ערך לפי החישוב החל על המשתמש, דיבידנד, ריבית, שכר דירה וכו' — לפי הגדרת המחוקק והוראות הביצוע).
+2. **2% (חדש מ־2025)** על **סך ההכנסה החייבת ממקור הוני** — כלומר הכנסות **שאינן** משכורת / עסק / מאמץ אישי כהגדרת החידוד במסמך (למשל דיבידנד, ריבית, רווח הון; **במסלול 102 הוני** הכנסה מ-RSU נכללת במקור הוני לעניין 2% לפי הפירוט בהוראת הביצוע).
+
+המרכיבים **מחושבים באופן עצמאי** (עודף כללי למול הסף לעומת עודף הוני למול אותו סף).
+
+### דוגמאות מספריות (מהוראת הביצוע — עיגולים לפי המסמך)
+
+| דוגמה | משכורת | דיבידנד | ריבית | סה״כ חייב | הוני | יסף 3% | יסף 2% | סה״כ יסף |
+|--------|--------|---------|-------|-----------|------|--------|--------|----------|
+| 3.1 | 400,000 | 200,000 | 100,000 | 700,000 | 300,000 | 0 | 0 | 0 |
+| 3.2 | 400,000 | 400,000 | 300,000 | 1,100,000 | 700,000 | 11,353.20 | 0 | 11,353.20 |
+| 3.3 | 400,000 | 500,000 | 600,000 | 1,500,000 | 1,100,000 | 23,353.20 | 7,568.80 | 30,922.00 |
+
+בדוגמאות: יסף 3% = 3% × max(0, סה״כ חייב − 721,560); יסף 2% = 2% × max(0, סה״כ הוני − 721,560).
+
+### הערות ליישום במחשבון
+
+- היסף אינו משנה את **שיעור רווח ההון** על כל מניה (25% / 30% לבעל שליטה בלבד); הוא נוסף **בנפרד** לפי בסיסים שנתיים.
+- סכומי המכירה מהתיק JFrog נסכמים לשני בסיסים: **ברוטו לכל הלוטים** (למען 3%) לעומת **רכיב מקור הוני מלוטים במסלול הוני / אופציות / ESPP הוני** (למען 2%), בתוספת שדה "הכנסה הונית אחרת".
 
 ## Income tax brackets — 2026
 

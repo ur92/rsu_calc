@@ -70,7 +70,7 @@ Full reference in [tax-rules.md](tax-rules.md), tested implementation in [tax_ca
 | ESPP (`price ≥ fmv_purchase`) | `net = price - (fmv_purchase - purchase_price) × marginal - (price - fmv_purchase) × cg_rate` |
 | ESPP (`price < fmv_purchase`) | `net = price - max(0, price - purchase_price) × marginal` — sell-below-FMV cap |
 
-`cg_rate = 0.30` above the 721,560 ₪/year surtax threshold or for controlling shareholders; `0.25` otherwise.
+`cg_rate = 0.25` normally; **`0.30` only for controlling shareholders**. Portfolio **מס יסף** (3% + 2% since 2025, threshold 721,560 ₪) is a **separate annual calculation** — see [tax-rules.md](tax-rules.md) section 121ב and `compute_surtax()` in [tax_calc.py](tax_calc.py).
 
 Marginal rate quick lookup by annual NIS salary (use [tax-rules.md](tax-rules.md) and `marginal_tax_on()` in [tax_calc.py](tax_calc.py) for precise 2026 brackets):
 - < 350,000 → 40%
@@ -85,20 +85,20 @@ Ask the user to provide actual grant FMVs if accuracy matters, or note this limi
 
 ## Sale priority rule
 
-Sort all sellable lots (blocked RSU, exercisable options, blocked ESPP) by effective tax rate ascending. The lowest tax rate is the most efficient to sell first.
+Sort sellable lots by **effective tax rate ascending**. In the web app, that rate includes **marginal portfolio יסף** (change in combined 3%+2% יסף when the lot is included in the sale plan), divided by the lot’s gross NIS — so lots that push annual income across the יסף thresholds rank worse.
 
 ## Tests
 
 The formulas, brackets, and surtax constants are pinned by a deterministic stdlib `unittest` suite. Run from the workspace root:
 
 ```bash
-python3 -m unittest .cursor/skills/jfrog-equity-analyzer/test_tax_calc.py -v
+python3 -m unittest discover -s .cursor/skills/jfrog-equity-analyzer -p test_tax_calc.py -v
 ```
 
 Or from the skill directory:
 
 ```bash
-python3 -m unittest test_tax_calc -v
+python3 -m unittest test_tax_calc.py -v
 ```
 
 Sentinel assertions guard the values that have shifted historically (`CAPITAL_GAINS_RATE_HIGH = 0.30`, `SURTAX_THRESHOLD = 721_560`, `BL_MONTHLY_CEILING = 51_910`, eTrade trustee withholding 62%/28%). If any of these drift, the relevant test fails and the change must be reflected in both `tax_calc.py` and `tax-rules.md` together.
