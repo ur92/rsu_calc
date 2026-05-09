@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    "id": "b2f5a0e",
+    "date": "2026-05-10",
+    "message": "sale plan UI — quantity sliders, two-column layout, stable sort, full-sale surtax",
+    "type": "feature"
+  },
+  {
+    "id": "2a75704",
+    "date": "2026-05-10",
+    "message": "add Israeli surtax (מס יסף) and sale simulation",
+    "type": "feature"
+  },
+  {
     "id": "8afef4b",
     "date": "2026-05-09",
     "message": "add \"מה חדש\" dropdown to header with changelog tracking",
