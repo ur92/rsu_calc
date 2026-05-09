@@ -1,20 +1,22 @@
 # Netlify deployment configuration for rsu_calc (rsucalcjfrog)
 #
 # Cost model:
-#   - Deploy previews (PR-triggered): FREE and unlimited
-#   - Production deploys (main branch): DISABLED — manual CLI deploys only
-#   - Branch deploys (non-PR push): DISABLED to save credits
+#   - Deploy previews (PR-triggered): FREE and unlimited — Netlify builds from git.
+#   - Production deploys: ~15 credits — script builds LOCALLY and uploads a ZIP directly.
+#     No build runs on Netlify's servers, so no build-minute credits are consumed.
 #
 # Workflow:
-#   - Open a PR for any feature branch -> free deploy preview generated automatically.
-#   - Production deploys are triggered manually via the direct Netlify API:
+#   - Open a PR for any feature branch → free deploy preview generated automatically.
+#   - Production deploys are triggered manually:
 #       export NETLIFY_AUTH_TOKEN=<personal-access-token>
-#       scripts/deploy.sh             # production
-#       scripts/deploy.sh --draft     # draft / preview
+#       scripts/deploy.sh             # build locally + upload ZIP
+#       scripts/deploy.sh --wait      # same + poll until live
 #     (Token: https://app.netlify.com/user/applications#personal-access-tokens)
-#     The corporate Zscaler proxy redirects all npm traffic through JFrog,
-#     where unstorage@^1.16.1 is curated out, so `npx netlify-cli` can't
-#     install on this network — hence the direct-API script.
+#
+# Why local build + ZIP upload instead of git-triggered build:
+#   1. Saves ~60 credits per deploy (no npm install / vite build on Netlify servers).
+#   2. The corporate Zscaler proxy blocks `npx netlify-cli` (unstorage@^1.16.1 is
+#      curated out in JFrog), so we use curl with the Netlify REST API directly.
 
 [build]
   command = "cd app && npm install && npm run build"
@@ -32,14 +34,9 @@
 [context.branch-deploy]
   ignore = "exit 0"
 
-# Skip Git-triggered production builds. Manual `netlify deploy --prod` from
-# the CLI bypasses this because it uploads pre-built artifacts directly.
+# Production git-push builds are disabled; deploys happen via scripts/deploy.sh.
 [context.production]
   ignore = "exit 0"
-
-[[edge_functions]]
-  path = "/api/stock-price"
-  function = "stockPrice"
 
 [[redirects]]
   from = "/api/stock-price"
