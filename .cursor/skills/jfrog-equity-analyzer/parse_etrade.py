@@ -158,6 +158,9 @@ def parse_rsu(rows: list[tuple]) -> list[dict]:
         first = next((v for v in sorted_v if v.get('fmvAtVest')), None)
         if first:
             g['fmvAtGrant'] = first['fmvAtVest']
+            # Indicate this is a fallback proxy; the web app fetches the real
+            # 20-day trailing average from /api/fmv-at-grant automatically.
+            g['fmvSource'] = 'vest-proxy'
     return grants
 
 

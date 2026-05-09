@@ -168,4 +168,8 @@ The lowest effective rate is the most efficient sale.
 
 ## FMV at grant — practical note
 
-The ITA defines the FMV-at-grant for listed-parent 102 honi grants as the **average closing price over the 30 trading days preceding the grant date**. eTrade does not export this value in `ByBenefitType_expanded`. The skill's `parse_etrade.py` approximates it using the price at the **first vest event** of each grant, which is usually higher than the true 30-day average and therefore over-estimates the ordinary-income portion. For accurate planning, look up the actual 30-day average separately and pass it in.
+**JFrog's RSU pricing method**: JFrog prices RSUs using the **20-trading-day trailing average closing price** ending on the day before the Compensation Committee meets to approve grants. The app automatically fetches this value from Yahoo Finance historical data using the grant date parsed from eTrade, via `/api/fmv-at-grant`. The FMV cell in the Grants table shows a `20d` badge when auto-calculated, a `vest` badge when falling back to the first-vest proxy (e.g. pre-IPO dates or network errors), and a `ידני` badge after manual edits.
+
+**ITA definition (for reference)**: The Israeli Tax Authority defines the FMV-at-grant for listed-parent 102 honi grants as the **average closing price over the 30 trading days preceding the grant date**. In practice JFrog's 20-day figure is used in the app as it matches the grant agreement price and is close to the ITA's value.
+
+**Fallback**: eTrade does not export grant-date FMV in `ByBenefitType_expanded`. If the `/api/fmv-at-grant` fetch fails (pre-IPO grant date, network error), the first vest event price is used as a proxy — this is usually higher than the true grant FMV and over-estimates the ordinary-income portion.

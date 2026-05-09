@@ -8,6 +8,12 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    "id": "pending",
+    "date": "2026-05-10",
+    "message": "חישוב FMV ביום הענקה אוטומטי — ממוצע 20 ימי מסחר לפי שיטת JFrog (במקום הערכה לפי vest ראשון)",
+    "type": "feature"
+  },
+  {
     "id": "b2f5a0e",
     "date": "2026-05-10",
     "message": "sale plan UI — quantity sliders, two-column layout, stable sort, full-sale surtax",

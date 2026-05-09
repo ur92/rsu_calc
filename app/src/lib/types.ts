@@ -1,3 +1,5 @@
+export type FmvSource = 'calculated' | 'vest-proxy' | 'manual';
+
 export interface VestEvent {
   vestDate: Date;
   qty: number;
@@ -8,6 +10,8 @@ export interface RsuGrant {
   grantNumber: string;
   grantDate: Date;
   fmvAtGrant: number;
+  /** How fmvAtGrant was determined. Absent until the FMV fetch resolves. */
+  fmvSource?: FmvSource;
   grantedQty: number;
   vestedQty: number;
   unvestedQty: number;
