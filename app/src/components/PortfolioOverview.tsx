@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { CircleHelp } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -7,7 +8,9 @@ import { addMonths, isAfter, getQuarter, getYear } from 'date-fns';
 import type { ParsedData } from '../lib/types';
 import {
   isCapitalTrack, rsuNetPerShare, optionNetPerShare, esppNetPerShare,
+  computeSurtax, SURTAX_THRESHOLD_NIS,
 } from '../lib/taxCalc';
+import { jfrogIncomeFromSalePlan, buildFullSalePlan } from '../lib/surtaxFromSalePlan';
 import { formatILS, tooltipILS } from '../lib/format';
 
 interface Props {
@@ -16,16 +19,33 @@ interface Props {
   rate: number;
   marginalRate: number;
   cgRate: number;
+  salaryNIS: number;
+  otherCapitalIncomeNIS: number;
 }
 
 const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#64748b'];
 
-export default function PortfolioOverview({ data, priceUSD, rate, marginalRate, cgRate }: Props) {
+export default function PortfolioOverview({
+  data, priceUSD, rate, marginalRate, cgRate, salaryNIS, otherCapitalIncomeNIS,
+}: Props) {
   const today = new Date();
   const horizon = addMonths(today, 12);
 
+  // Surtax assuming ALL available holdings are sold (for both "זמין עכשיו" and "מס יסף" cards)
+  const fullSaleSurtax = useMemo(() => {
+    const fullPlan = buildFullSalePlan(data, priceUSD);
+    const j = jfrogIncomeFromSalePlan(data, fullPlan, priceUSD, rate);
+    return computeSurtax({
+      salaryNIS,
+      jfrogSaleTotalIncomeNIS: j.totalNIS,
+      jfrogSaleCapitalSourceNIS: j.capitalSourceNIS,
+      otherCapitalIncomeNIS,
+    });
+  }, [data, priceUSD, rate, salaryNIS, otherCapitalIncomeNIS]);
+
   const { availTotal, vestTotal, futureNet, futureGross, futureShares, quarterlyData } = useMemo(() => {
-    // ── Available now (blocked shares / exercisable options) ──────────────
+    // availTotal always reflects the TOTAL available holdings (blockedQty / exercisableQty),
+    // independent of salePlan. salePlan only affects the surtax card.
     let optShares = 0, optGross = 0, optNet = 0;
     let rsuCapShares = 0, rsuCapGross = 0, rsuCapNet = 0;
     let rsuOrdShares = 0, rsuOrdGross = 0, rsuOrdNet = 0;
@@ -36,7 +56,7 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate, 
       const qty = o.blockedQty > 0 ? o.blockedQty : o.exercisableQty;
       if (qty <= 0 || priceUSD <= o.exercisePrice) continue;
       optShares += qty;
-      optGross += qty * priceUSD * rate;
+      optGross += qty * (priceUSD - o.exercisePrice) * rate;
       optNet += qty * optionNetPerShare(o.exercisePrice, priceUSD, cgRate) * rate;
     }
 
@@ -76,7 +96,6 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate, 
       netILS: optNet + rsuCapNet + rsuOrdNet + esppCapNet + esppOrdNet,
     };
 
-    // ── Vesting next 12 months + future ───────────────────────────────────
     const quarterMap = new Map<string, { label: string; netILS: number }>();
     let vestNetTotal = 0, vestGrossTotal = 0, vestSharesTotal = 0;
     let futureNetTotal = 0, futureGrossTotal = 0, futureSharesTotal = 0;
@@ -133,14 +152,14 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate, 
 
   return (
     <div className="space-y-5">
-      {/* Stat cards */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-4">
         <StatCard
           label="זמין עכשיו למכירה"
-          net={availTotal.netILS}
+          net={availTotal.netILS - fullSaleSurtax.totalNIS}
           gross={availTotal.grossILS}
           shares={availTotal.shares}
           color="blue"
+          surtaxNIS={fullSaleSurtax.totalNIS}
         />
         <StatCard
           label="יבשיל בעתיד"
@@ -149,9 +168,42 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate, 
           shares={vestTotal.shares + futureShares}
           color="purple"
         />
+        <div className="rounded-2xl p-5 border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900">
+          <p className="text-sm text-surface-500 dark:text-surface-400 inline-flex items-center gap-1.5">
+            מס יסף 2025+
+            <span className="relative inline-flex group/st">
+              <button
+                type="button"
+                aria-label="פירוט מס יסף"
+                className="inline-flex text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+                onClick={(e) => e.preventDefault()}
+              >
+                <CircleHelp className="w-4 h-4" />
+              </button>
+              <span
+                role="tooltip"
+                className="invisible opacity-0 group-hover/st:visible group-hover/st:opacity-100 group-focus-within/st:visible group-focus-within/st:opacity-100 transition-opacity duration-150 absolute z-30 right-0 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] p-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-xl text-right pointer-events-none text-xs leading-5 text-surface-700 dark:text-surface-300"
+              >
+                <span className="block font-semibold text-surface-900 dark:text-surface-100 mb-1">מס יסף — פירוט (מכירה מלאה)</span>
+                <span className="block">הכנסה חייבת כוללת: {formatILS(fullSaleSurtax.totalIncomeNIS)}</span>
+                <span className="block">עודף כולל מעל {formatILS(SURTAX_THRESHOLD_NIS)}: {formatILS(Math.max(0, fullSaleSurtax.totalIncomeNIS - SURTAX_THRESHOLD_NIS))}</span>
+                <span className="block mt-1">הכנסה ממקור הוני: {formatILS(fullSaleSurtax.capitalIncomeTotalNIS)}</span>
+                <span className="block">עודף הוני מעל {formatILS(SURTAX_THRESHOLD_NIS)}: {formatILS(Math.max(0, fullSaleSurtax.capitalIncomeTotalNIS - SURTAX_THRESHOLD_NIS))}</span>
+                <span className="block mt-1">3% על עודף כולל: {formatILS(fullSaleSurtax.yasaf3NIS)}</span>
+                <span className="block">2% על עודף הוני: {formatILS(fullSaleSurtax.yasaf2NIS)}</span>
+                <span className="block mt-1 font-semibold">סה״כ יסף: {formatILS(fullSaleSurtax.totalNIS)}</span>
+              </span>
+            </span>
+          </p>
+          <p className="mt-2 font-bold text-2xl text-amber-700 dark:text-amber-400 tabular-nums">
+            {formatILS(fullSaleSurtax.totalNIS)}
+          </p>
+          <p className="mt-1.5 text-xs text-surface-400 dark:text-surface-500">
+            אם כל מה שזמין נמכר — שכר + כל ה-lots + הכנסה הונית אחרת
+          </p>
+        </div>
       </div>
 
-      {/* Pie + quarterly bar */}
       <div className="grid lg:grid-cols-2 gap-5">
         <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
           <h3 className="font-semibold text-surface-800 dark:text-surface-200 mb-4">חלוקת נכסים</h3>
@@ -201,8 +253,8 @@ export default function PortfolioOverview({ data, priceUSD, rate, marginalRate, 
 }
 
 function StatCard({
-  label, net, gross, shares, color, highlight,
-}: { label: string; net: number; gross: number; shares: number; color: string; highlight?: boolean }) {
+  label, net, gross, shares, color, highlight, surtaxNIS,
+}: { label: string; net: number; gross: number; shares: number; color: string; highlight?: boolean; surtaxNIS?: number }) {
   const COLORS: Record<string, string> = {
     blue:   'text-blue-600 dark:text-blue-400',
     purple: 'text-purple-600 dark:text-purple-400',
@@ -224,6 +276,11 @@ function StatCard({
         <p className="text-xs text-surface-400 dark:text-surface-500">
           {shares.toLocaleString()} מניות
         </p>
+        {surtaxNIS !== undefined && surtaxNIS > 0 && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            כולל יסף: <span className="font-medium">{formatILS(surtaxNIS)}</span>
+          </p>
+        )}
       </div>
     </div>
   );
