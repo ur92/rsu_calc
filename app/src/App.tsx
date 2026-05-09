@@ -7,7 +7,6 @@ import PortfolioOverview from './components/PortfolioOverview';
 import GrantsTable from './components/GrantsTable';
 import OptionsTable from './components/OptionsTable';
 import EsppTable from './components/EsppTable';
-import SalePriority from './components/SalePriority';
 import AvailableNowTable from './components/AvailableNowTable';
 import FutureVestsTable from './components/FutureVestsTable';
 import { parseEtradeFile } from './lib/parseEtrade';
@@ -173,19 +172,12 @@ export default function App() {
 
         <PortfolioOverview data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
 
-        <div className="grid lg:grid-cols-2 gap-5 lg:items-start">
-          <div className="space-y-5">
-            <Section title="מניות זמינות עכשיו">
-              <AvailableNowTable data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
-            </Section>
-            <Section title="מניות עם הבשלה עתידית" subtitle="כל ההבשלות מעתה ועד תום לוח ה-vesting; שווי נטו במחיר הנוכחי.">
-              <FutureVestsTable data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
-            </Section>
-          </div>
-          <Section title="סדר עדיפות למכירה" subtitle="מסודר לפי שיעור מס אפקטיבי מהנמוך לגבוה.">
-            <SalePriority data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
-          </Section>
-        </div>
+        <Section title="מניות זמינות עכשיו (לפי עדיפויות למכירה)" subtitle="מסודר לפי שיעור מס אפקטיבי מהנמוך לגבוה">
+          <AvailableNowTable data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
+        </Section>
+        <Section title="מניות עם הבשלה עתידית" subtitle="כל ההבשלות מעתה ועד תום לוח ה-vesting; שווי נטו במחיר הנוכחי.">
+          <FutureVestsTable data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
+        </Section>
 
         <Section title="RSU Grants" subtitle="ניתן לערוך FMV ביום הענקה — eTrade לא מייצא ערך זה ישירות, ברירת מחדל לקוחה מה-vest הראשון.">
           <GrantsTable
