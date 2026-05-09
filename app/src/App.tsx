@@ -15,7 +15,8 @@ import { marginalRate, capitalGainsRate } from './lib/taxCalc';
 import { buildFullSalePlan, mergeSalePlanKeys } from './lib/surtaxFromSalePlan';
 import { useStockPrice } from './lib/useStockPrice';
 import { useExchangeRate } from './lib/useExchangeRate';
-import type { ParsedData } from './lib/types';
+import { useGrantFmv } from './lib/useGrantFmv';
+import type { FmvSource, ParsedData } from './lib/types';
 
 const DEFAULT_PRICE = 50;
 const DEFAULT_RATE = 3.6;
@@ -28,6 +29,9 @@ export default function App() {
   const [parsed, setParsed] = useState<ParsedData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
+
+  // Manual FMV overrides — kept separate so editing doesn't re-trigger the fetch hook
+  const [manualFmvOverrides, setManualFmvOverrides] = useState<Record<string, number>>({});
 
   const [parseGeneration, setParseGeneration] = useState(0);
   const lastParseGenSync = useRef(-1);
@@ -49,6 +53,31 @@ export default function App() {
   const mRate = useMemo(() => marginalRate(salary), [salary]);
   const cgRate = useMemo(() => capitalGainsRate(salary), [salary]);
 
+  // Fetch 20-day trailing average for each unique grant date (JFrog's RSU pricing method)
+  const { fmvByDate, isLoading: fmvLoading } = useGrantFmv(parsed?.rsus ?? []);
+
+  // Merge: manual override > 20d calculated > vest-proxy fallback
+  const rsusWithFmv = useMemo(() => {
+    if (!parsed) return [];
+    return parsed.rsus.map((g) => {
+      if (manualFmvOverrides[g.grantNumber] !== undefined) {
+        return { ...g, fmvAtGrant: manualFmvOverrides[g.grantNumber], fmvSource: 'manual' as FmvSource };
+      }
+      const dateStr = g.grantDate.toISOString().slice(0, 10);
+      const calcFmv = fmvByDate[dateStr];
+      if (calcFmv !== undefined) {
+        return { ...g, fmvAtGrant: calcFmv, fmvSource: 'calculated' as FmvSource };
+      }
+      return { ...g, fmvSource: 'vest-proxy' as FmvSource };
+    });
+  }, [parsed, fmvByDate, manualFmvOverrides]);
+
+  // effectiveParsed replaces parsed.rsus with the FMV-corrected version everywhere
+  const effectiveParsed = useMemo<ParsedData | null>(() => {
+    if (!parsed) return null;
+    return { ...parsed, rsus: rsusWithFmv };
+  }, [parsed, rsusWithFmv]);
+
   const handleAnalyze = async () => {
     if (!file) return;
     setParsing(true);
@@ -65,13 +94,7 @@ export default function App() {
   };
 
   const handleEditFmv = (grantNumber: string, fmv: number) => {
-    if (!parsed) return;
-    setParsed({
-      ...parsed,
-      rsus: parsed.rsus.map((g) =>
-        g.grantNumber === grantNumber ? { ...g, fmvAtGrant: fmv } : g,
-      ),
-    });
+    setManualFmvOverrides((prev) => ({ ...prev, [grantNumber]: fmv }));
   };
 
   const handleReset = () => {
@@ -80,25 +103,26 @@ export default function App() {
     setParseError(null);
     setSalePlan({});
     setParseGeneration(0);
+    setManualFmvOverrides({});
     lastParseGenSync.current = -1;
   };
 
   useLayoutEffect(() => {
-    if (!parsed) return;
-    const built = buildFullSalePlan(parsed, priceUSD);
+    if (!effectiveParsed) return;
+    const built = buildFullSalePlan(effectiveParsed, priceUSD);
     if (lastParseGenSync.current !== parseGeneration) {
       lastParseGenSync.current = parseGeneration;
       setSalePlan(built);
     } else {
       setSalePlan((prev) => mergeSalePlanKeys(prev, built));
     }
-  }, [parsed, priceUSD, parseGeneration]);
+  }, [effectiveParsed, priceUSD, parseGeneration]);
 
   const handleSalePlanChange = useCallback((key: string, qty: number) => {
     setSalePlan((p) => ({ ...p, [key]: qty }));
   }, []);
 
-  if (!parsed) {
+  if (!effectiveParsed) {
     return (
       <div dir="rtl" className="min-h-screen flex items-center justify-center p-4 bg-surface-50 dark:bg-surface-950">
         <div className="w-full max-w-xl space-y-6">
@@ -215,7 +239,7 @@ export default function App() {
         />
 
         <PortfolioOverview
-          data={parsed}
+          data={effectiveParsed}
           priceUSD={priceUSD}
           rate={rate}
           marginalRate={mRate}
@@ -226,7 +250,7 @@ export default function App() {
 
         <Section title="מניות זמינות עכשיו (לפי עדיפויות למכירה)" subtitle="מסודר לפי שיעור מס אפקטיבי מהנמוך לגבוה">
           <AvailableNowTable
-            data={parsed}
+            data={effectiveParsed}
             priceUSD={priceUSD}
             rate={rate}
             marginalRate={mRate}
@@ -238,26 +262,27 @@ export default function App() {
           />
         </Section>
         <Section title="מניות עם הבשלה עתידית" subtitle="כל ההבשלות מעתה ועד תום לוח ה-vesting; שווי נטו במחיר הנוכחי.">
-          <FutureVestsTable data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
+          <FutureVestsTable data={effectiveParsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
         </Section>
 
-        <Section title="RSU Grants" subtitle="ניתן לערוך FMV ביום הענקה — eTrade לא מייצא ערך זה ישירות, ברירת מחדל לקוחה מה-vest הראשון.">
+        <Section title="RSU Grants" subtitle="FMV ביום הענקה — ממוצע 20 ימי מסחר לפני תאריך ההענקה (שיטת JFrog). ניתן לעריכה ידנית.">
           <GrantsTable
-            rsus={parsed.rsus}
+            rsus={rsusWithFmv}
             priceUSD={priceUSD}
             rate={rate}
             marginalRate={mRate}
             cgRate={cgRate}
             onEditFmv={handleEditFmv}
+            fmvLoading={fmvLoading}
           />
         </Section>
 
         <Section title="אופציות (NQ)">
-          <OptionsTable options={parsed.options} priceUSD={priceUSD} rate={rate} cgRate={cgRate} />
+          <OptionsTable options={effectiveParsed.options} priceUSD={priceUSD} rate={rate} cgRate={cgRate} />
         </Section>
 
         <Section title="ESPP">
-          <EsppTable espp={parsed.espp} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
+          <EsppTable espp={effectiveParsed.espp} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
         </Section>
 
         <footer className="pt-8 pb-4 text-center text-xs text-surface-400 dark:text-surface-600">

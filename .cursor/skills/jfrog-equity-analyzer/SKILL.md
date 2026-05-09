@@ -77,11 +77,13 @@ Marginal rate quick lookup by annual NIS salary (use [tax-rules.md](tax-rules.md
 - 350,000–700,000 → 41%
 - ≥ 700,000 → 53%
 
-## FMV at grant caveat
+## FMV at grant
 
-The eTrade `ByBenefitType_expanded` file does NOT export the grant-date FMV used by the Israeli tax authority (typically the average price over the 30 trading days before grant). The parser uses the price at the **first vest event** as a proxy — usually higher than the true grant FMV (overestimates the employment-income portion, understates net).
+The web app automatically fetches the **20-trading-day trailing average** closing price for each grant date via `/api/fmv-at-grant` (JFrog's RSU pricing method). The GrantsTable shows a `20d` badge when this succeeds.
 
-Ask the user to provide actual grant FMVs if accuracy matters, or note this limitation in the canvas.
+**Fallback**: eTrade does not export grant-date FMV. If the fetch fails, the parser uses the first vest event price as a proxy — usually higher than the true grant FMV (overestimates the employment-income portion, understates net). The table shows a `vest` badge in that case.
+
+When using the Python skill (`parse_etrade.py`) outside the web app, look up the 20-day average manually: take the 20 trading days ending on the grant date, average the FROG closing prices from Yahoo Finance or a broker history export, and pass the result as `fmv_grant` to the tax functions.
 
 ## Sale priority rule
 

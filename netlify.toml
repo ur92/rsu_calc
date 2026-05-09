@@ -19,6 +19,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/fmv-at-grant"
+  to = "/.netlify/functions/fmv-at-grant"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
