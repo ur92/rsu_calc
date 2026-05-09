@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Calculator, Moon, Sun } from 'lucide-react';
 import FileUpload from './components/FileUpload';
 import SalaryInput from './components/SalaryInput';
@@ -8,9 +8,11 @@ import GrantsTable from './components/GrantsTable';
 import OptionsTable from './components/OptionsTable';
 import EsppTable from './components/EsppTable';
 import AvailableNowTable from './components/AvailableNowTable';
+import WhatsNewDropdown from './components/WhatsNewDropdown';
 import FutureVestsTable from './components/FutureVestsTable';
 import { parseEtradeFile } from './lib/parseEtrade';
 import { marginalRate, capitalGainsRate } from './lib/taxCalc';
+import { buildFullSalePlan, mergeSalePlanKeys } from './lib/surtaxFromSalePlan';
 import { useStockPrice } from './lib/useStockPrice';
 import { useExchangeRate } from './lib/useExchangeRate';
 import type { ParsedData } from './lib/types';
@@ -21,9 +23,14 @@ const DEFAULT_RATE = 3.6;
 export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [salary, setSalary] = useState<number>(300_000);
+  const [otherCapitalIncomeNIS, setOtherCapitalIncomeNIS] = useState(0);
+  const [salePlan, setSalePlan] = useState<Record<string, number>>({});
   const [parsed, setParsed] = useState<ParsedData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
+
+  const [parseGeneration, setParseGeneration] = useState(0);
+  const lastParseGenSync = useRef(-1);
 
   const { priceUSD: livePrice, isLive, isLoading } = useStockPrice(DEFAULT_PRICE);
   const [priceOverride, setPriceOverride] = useState<number | null>(null);
@@ -49,6 +56,7 @@ export default function App() {
     try {
       const data = await parseEtradeFile(file);
       setParsed(data);
+      setParseGeneration((n) => n + 1);
     } catch (err) {
       setParseError(err instanceof Error ? err.message : 'שגיאה בניתוח הקובץ');
     } finally {
@@ -70,7 +78,25 @@ export default function App() {
     setParsed(null);
     setFile(null);
     setParseError(null);
+    setSalePlan({});
+    setParseGeneration(0);
+    lastParseGenSync.current = -1;
   };
+
+  useLayoutEffect(() => {
+    if (!parsed) return;
+    const built = buildFullSalePlan(parsed, priceUSD);
+    if (lastParseGenSync.current !== parseGeneration) {
+      lastParseGenSync.current = parseGeneration;
+      setSalePlan(built);
+    } else {
+      setSalePlan((prev) => mergeSalePlanKeys(prev, built));
+    }
+  }, [parsed, priceUSD, parseGeneration]);
+
+  const handleSalePlanChange = useCallback((key: string, qty: number) => {
+    setSalePlan((p) => ({ ...p, [key]: qty }));
+  }, []);
 
   if (!parsed) {
     return (
@@ -92,7 +118,13 @@ export default function App() {
 
           <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6 space-y-5">
             <FileUpload onFile={setFile} fileName={file?.name} />
-            <SalaryInput value={salary} onChange={setSalary} marginalRate={mRate} />
+            <SalaryInput
+              value={salary}
+              onChange={setSalary}
+              marginalRate={mRate}
+              otherCapitalIncomeNIS={otherCapitalIncomeNIS}
+              onOtherCapitalIncomeChange={setOtherCapitalIncomeNIS}
+            />
 
             {parseError && (
               <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded-lg p-3">
@@ -140,6 +172,7 @@ export default function App() {
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <WhatsNewDropdown />
             <button
               onClick={() => setIsDark((v) => !v)}
               className="p-2 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 text-surface-600 dark:text-surface-400"
@@ -170,10 +203,40 @@ export default function App() {
           isRateLoading={rateIsLoading}
         />
 
-        <PortfolioOverview data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
+        <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5">
+          <h3 className="font-semibold text-surface-800 dark:text-surface-200 mb-3">שכר ומקורות הכנסה</h3>
+          <SalaryInput
+            value={salary}
+            onChange={setSalary}
+            marginalRate={mRate}
+            otherCapitalIncomeNIS={otherCapitalIncomeNIS}
+            onOtherCapitalIncomeChange={setOtherCapitalIncomeNIS}
+          />
+        </div>
+
+        <PortfolioOverview
+          data={parsed}
+          priceUSD={priceUSD}
+          rate={rate}
+          marginalRate={mRate}
+          cgRate={cgRate}
+          salaryNIS={salary}
+          salePlan={salePlan}
+          otherCapitalIncomeNIS={otherCapitalIncomeNIS}
+        />
 
         <Section title="מניות זמינות עכשיו (לפי עדיפויות למכירה)" subtitle="מסודר לפי שיעור מס אפקטיבי מהנמוך לגבוה">
-          <AvailableNowTable data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />
+          <AvailableNowTable
+            data={parsed}
+            priceUSD={priceUSD}
+            rate={rate}
+            marginalRate={mRate}
+            cgRate={cgRate}
+            salaryNIS={salary}
+            salePlan={salePlan}
+            onSalePlanChange={handleSalePlanChange}
+            otherCapitalIncomeNIS={otherCapitalIncomeNIS}
+          />
         </Section>
         <Section title="מניות עם הבשלה עתידית" subtitle="כל ההבשלות מעתה ועד תום לוח ה-vesting; שווי נטו במחיר הנוכחי.">
           <FutureVestsTable data={parsed} priceUSD={priceUSD} rate={rate} marginalRate={mRate} cgRate={cgRate} />

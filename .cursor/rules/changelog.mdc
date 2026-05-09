@@ -1,0 +1,56 @@
+---
+description: Update the "מה חדש" changelog for the RSU/options calculator when committing product-relevant changes
+globs:
+alwaysApply: true
+---
+
+# Changelog — "מה חדש" (rsu_calc)
+
+This project is the **JFrog RSU/options calculator** (Israeli Section 102 tax analysis). Entries in `app/src/data/changelog.ts` power the header **מה חדש** dropdown.
+
+**Entries must be curated manually in Hebrew.** Do **not** rely on raw English commit subjects as user-facing text. The generator may append commits that match `feat`, `feat(scope)`, `data`, etc., but a developer should replace or add concise Hebrew descriptions for anything that should appear in the product.
+
+Only add an entry for **product-relevant** changes that are visible to the user.
+
+## What counts as product-relevant
+
+- New features, tables, or analysis flows in the app
+- Changes to tax logic, prices, rates, or numbers shown in results
+- Bug fixes that change or correct outputs or visible UI behavior
+- New or updated data sources (e.g. tax brackets, FMV behavior) that affect the analysis
+
+## What does NOT count
+
+- Netlify/deploy configuration, hosting, or environment-only changes
+- Linting, formatting, types-only refactors, or build/CI infrastructure
+- Dependency bumps or tooling with no user-visible behavior change
+- Internal refactors with no change to calculator results or UX
+
+## How to add an entry
+
+Add a new object at the **top** of the `changelog` array in `app/src/data/changelog.ts`:
+
+```typescript
+{ id: '<short-commit-hash>', date: 'YYYY-MM-DD', message: '<Hebrew description>', type: '<type>' },
+```
+
+- **id**: The short git commit hash. If the hash is unknown before commit, you may use a placeholder like `'pending'`; the generator can reconcile on the next run when aligned with git history.
+- **date**: The change date in `YYYY-MM-DD`.
+- **message**: A short Hebrew sentence from the user’s perspective (not a raw `feat(...):` line).
+- **type**: One of `'feature'`, `'data'`, `'docs'`, `'fix'`, `'update'`.
+
+### Type reference
+
+| Type | Hebrew label | When to use |
+|------|-------------|------------|
+| `feature` | פיצ׳ר | New capability, screen, or major addition |
+| `data` | נתונים | Tax brackets, rates, prices, or other numbers/data changed |
+| `docs` | מסמך | Documentation or copy that matters to users (if surfaced) |
+| `fix` | תיקון | Bug fix visible in results or the UI |
+| `update` | עדכון | Improvement to existing behavior or content |
+
+## Regeneration from git
+
+The production build runs `scripts/generate-changelog.js`, which merges conventional commits (`feat`, `feat(scope)`, `data`, `docs`, `fix`, `update`, with or without a scope) with the file and preserves curated rows. Curated Hebrew text for a commit id always wins over the stripped commit subject.
+
+Running **`changelog`** from `app/` (`npm run changelog`) regenerates `changelog.ts` from git history. That script **does not** add Hebrew messages automatically—you must edit the file and add or adjust Hebrew `message` text for user-facing entries.

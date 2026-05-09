@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node ../scripts/generate-changelog.js && tsc -b && vite build",
+    "changelog": "node ../scripts/generate-changelog.js",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview"
