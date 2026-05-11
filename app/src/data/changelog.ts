@@ -9,6 +9,12 @@ export interface ChangelogEntry {
 export const changelog: ChangelogEntry[] = [
   {
     "id": "pending",
+    "date": "2026-05-11",
+    "message": "תיקון שיעורי ביטוח לאומי ומס בריאות לשנת 2026 (ב״ל 1.04%+7%, בריאות 3.23%+5.17%) וכלל תקרת שכר: מי שמשכורתו החודשית עולה על 51,910 ₪ לא משלם ב״ל/בריאות על הכנסה פירותית ממניות",
+    "type": "data"
+  },
+  {
+    "id": "pending",
     "date": "2026-05-10",
     "message": "חישוב FMV ביום הענקה אוטומטי — ממוצע 20 ימי מסחר לפי שיטת JFrog (במקום הערכה לפי vest ראשון)",
     "type": "feature"

@@ -8,14 +8,69 @@ export const SURTAX_THRESHOLD_NIS = 721_560;
 export const CAPITAL_GAINS_RATE_BASE = 0.25;
 export const CAPITAL_GAINS_RATE_HIGH = 0.30;
 
+// Bituach Leumi + Mas Briut (employee share) — 2026 rates
+export const BL_REDUCED_CEILING = 7_703;
+export const BL_MONTHLY_CEILING = 51_910;
+export const BL_HEALTH_REDUCED_TOTAL = 0.0427; // BL 1.04% + health 3.23%
+export const BL_HEALTH_FULL_TOTAL = 0.1217;    // BL 7.00% + health 5.17%
+
 /**
- * Israeli combined marginal tax rate (income tax + Bituach Leumi + Mas Briut + surtax).
- * Approximations used as defaults; individual situations vary.
+ * Combined BL + health tax on a single month's income (employee share, 2026).
+ *
+ * Reduced rates (4.27%) apply to the first 7,703 ₪, full rates (12.17%)
+ * from 7,703 ₪ up to the monthly ceiling of 51,910 ₪. No contribution above
+ * the ceiling.
+ */
+export function bituachLeumiEmployee(monthlyIncomeNIS: number): number {
+  if (monthlyIncomeNIS <= 0) return 0;
+  const reduced = Math.min(monthlyIncomeNIS, BL_REDUCED_CEILING);
+  const aboveReduced = Math.max(
+    0,
+    Math.min(monthlyIncomeNIS, BL_MONTHLY_CEILING) - BL_REDUCED_CEILING,
+  );
+  return reduced * BL_HEALTH_REDUCED_TOTAL + aboveReduced * BL_HEALTH_FULL_TOTAL;
+}
+
+// 2026 piecewise income-tax brackets (income tax only, before BL/health)
+const INCOME_TAX_BRACKETS_2026: Array<[number, number]> = [
+  [84_120, 0.10],
+  [120_720, 0.14],
+  [228_000, 0.20],
+  [301_200, 0.31],
+  [560_280, 0.35],
+  [721_560, 0.47],
+  [Infinity, 0.50], // 47% + 3% yasaf at the top
+];
+
+/**
+ * Marginal income-tax rate (NOT including BL/health) at a given annual gross.
+ * Returns the rate of the bracket in which the last NIS of income falls.
+ */
+export function incomeTaxMarginalRate(annualSalaryNIS: number): number {
+  for (const [top, rate] of INCOME_TAX_BRACKETS_2026) {
+    if (annualSalaryNIS <= top) return rate;
+  }
+  return 0.50;
+}
+
+/**
+ * Combined marginal rate for פירותי (ordinary-income) equity: income tax +
+ * BL/health applicable to equity income.
+ *
+ * BL/health ceiling rule: if the employee's regular monthly salary
+ * (annualSalaryNIS / 12) already equals or exceeds the monthly ceiling
+ * (51,910 ₪ in 2026), the RSU/option/ESPP ordinary-income portion carries
+ * zero additional BL/health. Only income tax applies.
+ *
+ * For salaries below the ceiling, BL/health at the full rate (12.17%) is
+ * added — all JFrog employees earn well above the reduced-rate threshold
+ * (7,703 ₪/month) so only the full rate is relevant.
  */
 export function marginalRate(annualSalaryNIS: number): number {
-  if (annualSalaryNIS < 350_000) return 0.40;
-  if (annualSalaryNIS < 700_000) return 0.41;
-  return 0.53;
+  const itRate = incomeTaxMarginalRate(annualSalaryNIS);
+  const monthlySalary = annualSalaryNIS / 12;
+  const blRate = monthlySalary >= BL_MONTHLY_CEILING ? 0 : BL_HEALTH_FULL_TOTAL;
+  return itRate + blRate;
 }
 
 /**
