@@ -9,6 +9,12 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    "id": "5d5d2e3",
+    "date": "2026-05-11",
+    "message": "תיקון גלילה אופקית לא רצויה במובייל (iOS Safari)",
+    "type": "fix"
+  },
+  {
     "id": "469114d",
     "date": "2026-05-11",
     "message": "תיקוני מובייל: כותרת תמיד גלויה, פאנל 'מה חדש' לא חורג מהמסך, פירוט מס לחיץ בנגיעה, כרטיסי מניות מוצגים אנכית",

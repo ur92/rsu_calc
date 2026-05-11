@@ -57,7 +57,7 @@ export default function GrantsTable({ rsus, priceUSD, rate, marginalRate, cgRate
   }
 
   return (
-    <div className="overflow-x-auto scrollbar-thin rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900">
+    <div className="overflow-x-auto scrollbar-thin max-w-full rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900">
       <table className="w-full text-sm">
         <thead className="bg-surface-50 dark:bg-surface-800/50">
           <tr>

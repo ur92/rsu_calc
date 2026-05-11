@@ -62,7 +62,7 @@ export default function FutureVestsTable({ data, priceUSD, rate, marginalRate, c
   }
 
   return (
-    <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-hidden overflow-x-auto">
+    <div className="rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 overflow-hidden overflow-x-auto max-w-full">
       <table className="w-full text-sm">
         <thead className="bg-surface-50 dark:bg-surface-800/50">
           <tr>
