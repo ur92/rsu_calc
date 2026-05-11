@@ -192,7 +192,7 @@ export default function App() {
             <div className="w-9 h-9 rounded-lg bg-primary-500 text-white flex items-center justify-center shrink-0">
               <Calculator size={18} />
             </div>
-            <h1 className="font-bold text-surface-900 dark:text-surface-100 truncate hidden sm:block">
+            <h1 className="font-bold text-surface-900 dark:text-surface-100 truncate">
               מחשבון RSU/אופציות — JFrog
             </h1>
           </div>

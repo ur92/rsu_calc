@@ -38,6 +38,12 @@
   scrollbar-width: thin;
 }
 
+html {
+  /* Prevent horizontal overflow from appearing as a scrollbar or
+     causing sticky headers to mis-clip on WebKit/Safari mobile. */
+  overflow-x: clip;
+}
+
 body {
   font-family: "Heebo", sans-serif;
   background-color: var(--color-surface-50);

@@ -8,6 +8,12 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    "id": "635e886",
+    "date": "2026-05-11",
+    "message": "תיקון כותרת חתוכה במובייל — אייקון המחשבון תמיד גלוי בכל סוגי הדפדפנים",
+    "type": "fix"
+  },
+  {
     "id": "f4ab782",
     "date": "2026-05-11",
     "message": "תיקוני UX למובייל — חלון 'מה חדש' לא חורג מהמסך ופירוט המס לחיץ בנגיעה",
