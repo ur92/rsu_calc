@@ -47,9 +47,9 @@ body {
   background-color: var(--color-surface-50);
   color: var(--color-surface-900);
   direction: rtl;
-  /* Prevent the page from scrolling horizontally on iOS Safari.
-     overflow-x:auto table wrappers remain internally scrollable. */
-  overflow-x: hidden;
+  /* clip (unlike hidden) does not create a scroll container, so
+     position:sticky in the header keeps working on iOS Safari. */
+  overflow-x: clip;
 }
 
 .dark body {
