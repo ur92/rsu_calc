@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import type { ParsedData } from '../lib/types';
 import {
   isCapitalTrack, rsuNetPerShare, rsuEffectiveTaxRate,
@@ -13,24 +13,22 @@ import { formatILS } from '../lib/format';
 import TaxBreakdownTooltip from './TaxBreakdownTooltip';
 import { CircleHelp as _CircleHelp } from 'lucide-react'; // kept for potential future use
 
-// ── Step-slider helpers ──────────────────────────────────────────────────────
-const STEP_PCTS = [0, 0.25, 0.5, 0.75, 1.0] as const;
-const STEP_LABELS = ['0', '25%', '50%', '75%', '100%'] as const;
+// ── Slider tick labels (decorative reference marks) ─────────────────────────
+const TICK_LABELS = ['0', '25%', '50%', '75%', '100%'] as const;
 
-function stepToQty(step: number, maxShares: number): number {
-  return Math.round(maxShares * STEP_PCTS[step as 0 | 1 | 2 | 3 | 4]);
-}
+// ── "אני רוצה לקבל נטו" — humorous over-budget messages ──────────────────────
+const OVER_BUDGET_MSGS = [
+  'מי אתה חושב שאתה? עומר אדם?',
+  'מספר יפה. גם הציפיות שלך',
+  'גם אם FROG ב-500$, עדיין לא',
+  'כנראה הייתה צריך להיות מייסד, לא עובד',
+  'אולי הייתה כדאי לעבוד ב-Google',
+  'הבוס שלך מרוויח את זה. לא אתה',
+  'מאיפה בדיוק חשבת שזה יגיע?',
+  'איה איה למה ככה?',
+];
 
-function qtyToStep(qty: number, maxShares: number): number {
-  if (maxShares <= 0) return 0;
-  const pct = qty / maxShares;
-  let closest = 0, minDist = Infinity;
-  for (let i = 0; i < STEP_PCTS.length; i++) {
-    const d = Math.abs(pct - STEP_PCTS[i]);
-    if (d < minDist) { minDist = d; closest = i; }
-  }
-  return closest;
-}
+
 
 interface Props {
   data: ParsedData;
@@ -239,12 +237,57 @@ export default function AvailableNowTable({
     for (const lot of rawLots) onSalePlanChange(lot.key, 0);
   }, [rawLots, onSalePlanChange]);
 
-  const onStepChange = useCallback(
-    (key: string, maxShares: number, step: number) => {
-      onSalePlanChange(key, stepToQty(step, maxShares));
-    },
-    [onSalePlanChange],
-  );
+
+  // ── "אני רוצה לקבל נטו" state + handler ─────────────────────────────────
+  const [wantOpen, setWantOpen] = useState(false);
+  const [wantValue, setWantValue] = useState('');
+  const [wantError, setWantError] = useState<string | null>(null);
+  const wantDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (wantDebounceRef.current) clearTimeout(wantDebounceRef.current); }, []);
+
+  const handleWantNet = useCallback((rawInput: string) => {
+    const target = parseFloat(rawInput.replace(/,/g, '')) * 1000;
+    if (isNaN(target) || target <= 0) {
+      setWantError('אנא הזן סכום תקין');
+      return;
+    }
+
+    // Compute maximum true net achievable (pre-surtax minus full portfolio surtax)
+    const fullPlan = rawLots.reduce<Record<string, number>>((acc, l) => {
+      acc[l.key] = l.maxShares;
+      return acc;
+    }, {});
+    const fullAgg = jfrogIncomeFromSalePlan(data, fullPlan, priceUSD, rate);
+    const fullSur = computeSurtax({
+      salaryNIS,
+      jfrogSaleTotalIncomeNIS: fullAgg.totalNIS,
+      jfrogSaleCapitalSourceNIS: fullAgg.capitalSourceNIS,
+      otherCapitalIncomeNIS,
+    });
+    const fullNetILS =
+      rawLots.reduce((s, l) => s + l.netPerShare * l.maxShares * rate, 0) - fullSur.totalNIS;
+
+    if (target > fullNetILS) {
+      setWantError(OVER_BUDGET_MSGS[Math.floor(Math.random() * OVER_BUDGET_MSGS.length)]);
+      return;
+    }
+
+    // Greedy allocation: fill lots in priority order (ascending effective tax rate)
+    const sorted = [...rawLots].sort((a, b) => a.baseEffectiveTaxRate - b.baseEffectiveTaxRate);
+    let remaining = target;
+    for (const lot of sorted) {
+      const netPS = lot.netPerShare * rate;
+      if (netPS <= 0 || remaining <= 0) {
+        onSalePlanChange(lot.key, 0);
+        continue;
+      }
+      const qty = Math.min(Math.ceil(remaining / netPS), lot.maxShares);
+      onSalePlanChange(lot.key, qty);
+      remaining -= netPS * qty;
+    }
+
+    setWantError(null);
+  }, [rawLots, data, priceUSD, rate, salaryNIS, otherCapitalIncomeNIS, onSalePlanChange]);
 
   if (rawLots.length === 0) {
     return <p className="text-sm text-surface-500">אין מניות זמינות למכירה כרגע.</p>;
@@ -313,27 +356,76 @@ export default function AvailableNowTable({
 
   return (
     <div className="space-y-2">
-      {/* Toolbar — full width */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={selectAll}
-            className="px-3 py-1.5 rounded-lg border border-surface-300 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-800 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700"
-          >
-            בחר הכל
-          </button>
-          <button
-            type="button"
-            onClick={clearAll}
-            className="px-3 py-1.5 rounded-lg border border-surface-300 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-800 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700"
-          >
-            אפס
-          </button>
+      {/* Toolbar — full width, includes "אני רוצה לקבל נטו" inline */}
+      <div className="flex flex-col gap-1 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Want-net: collapsed button or expanded inline form */}
+            {!wantOpen ? (
+              <button
+                type="button"
+                onClick={() => { setWantOpen(true); setWantError(null); }}
+                className="px-3 py-1.5 rounded-lg border border-primary-400 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/50 font-medium"
+              >
+                אני רוצה לקבל נטו...
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 self-stretch">
+                <span className="text-surface-600 dark:text-surface-400 font-medium">אני רוצה לקבל נטו</span>
+                <input
+                  type="number"
+                  dir="ltr"
+                  placeholder="0"
+                  step={10}
+                  value={wantValue}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setWantValue(v);
+                    if (wantDebounceRef.current) clearTimeout(wantDebounceRef.current);
+                    wantDebounceRef.current = setTimeout(() => handleWantNet(v), 50);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setWantOpen(false); setWantError(null); setWantValue(''); }
+                  }}
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
+                  autoFocus
+                  className="w-20 px-2 py-1 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-800 dark:text-surface-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
+                <span className="text-surface-500 dark:text-surface-400 text-xs">אלפי ₪</span>
+                <button
+                  type="button"
+                  onClick={() => { setWantOpen(false); setWantError(null); setWantValue(''); }}
+                  className="px-2 py-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 text-base leading-none"
+                  aria-label="סגור"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            {/* Divider between want-net and the select-all/reset buttons */}
+            <span className="w-px h-5 bg-surface-200 dark:bg-surface-700 self-center" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={selectAll}
+              className="px-3 py-1.5 rounded-lg border border-surface-300 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-800 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700"
+            >
+              בחר הכל
+            </button>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="px-3 py-1.5 rounded-lg border border-surface-300 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-800 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700"
+            >
+              אפס
+            </button>
+          </div>
+          <span className="text-surface-600 dark:text-surface-400 tabular-nums">
+            נבחרו למכירה: <span className="font-semibold text-surface-800 dark:text-surface-200">{selectedTotalQty.toLocaleString()}</span> מניות
+          </span>
         </div>
-        <span className="text-surface-600 dark:text-surface-400 tabular-nums">
-          נבחרו למכירה: <span className="font-semibold text-surface-800 dark:text-surface-200">{selectedTotalQty.toLocaleString()}</span> מניות
-        </span>
+        {wantError && (
+          <p className="text-sm font-medium text-rose-600 dark:text-rose-400">{wantError}</p>
+        )}
       </div>
 
       {/* Two-column on large screens: lots left, summary right (sticky) */}
@@ -372,30 +464,12 @@ export default function AvailableNowTable({
                       {item.type} · {item.maxShares.toLocaleString()} זמינות
                     </p>
                     {/* Step slider — 0 / 25% / 50% / 75% / 100% */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-[10px] text-surface-400 dark:text-surface-500">
-                        <span>כמות למכירה</span>
-                        <span className="tabular-nums font-medium text-surface-600 dark:text-surface-300">
-                          {STEP_LABELS[qtyToStep(item.planQty, item.maxShares)]}
-                          {item.planQty > 0 && (
-                            <span className="text-surface-400 dark:text-surface-500"> ({item.planQty.toLocaleString()})</span>
-                          )}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={4}
-                        step={1}
-                        value={qtyToStep(item.planQty, item.maxShares)}
-                        onChange={(e) => onStepChange(item.key, item.maxShares, Number(e.target.value))}
-                        className="w-full accent-primary-500 cursor-pointer"
-                        style={{ WebkitAppearance: 'slider-horizontal' }}
-                      />
-                      <div className="flex justify-between text-[9px] text-surface-300 dark:text-surface-600 select-none">
-                        {STEP_LABELS.map((l) => <span key={l}>{l}</span>)}
-                      </div>
-                    </div>
+                    <LotSlider
+                      planQty={item.planQty}
+                      maxShares={item.maxShares}
+                      lotKey={item.key}
+                      onSalePlanChange={onSalePlanChange}
+                    />
                   </div>
                 </div>
                 <div className="flex-1 flex flex-col gap-2 min-w-0">
@@ -433,6 +507,75 @@ export default function AvailableNowTable({
           {taxSummaryPanel}
         </div>
       </div>{/* end two-column wrapper */}
+    </div>
+  );
+}
+
+const SLIDER_THROTTLE_MS = 100;
+
+function LotSlider({
+  planQty, maxShares, lotKey, onSalePlanChange,
+}: {
+  planQty: number;
+  maxShares: number;
+  lotKey: string;
+  onSalePlanChange: (key: string, qty: number) => void;
+}) {
+  const committedPct = maxShares > 0 ? Math.round(planQty / maxShares * 100) : 0;
+  const [localPct, setLocalPct] = useState(committedPct);
+
+  useEffect(() => { setLocalPct(committedPct); }, [committedPct]);
+
+  const localQty = Math.round(maxShares * localPct / 100);
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFiredRef = useRef<number>(0);
+
+  // Cancel pending timer on unmount
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const commit = useCallback((val: number) => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    lastFiredRef.current = Date.now();
+    onSalePlanChange(lotKey, Math.round(maxShares * val / 100));
+  }, [lotKey, maxShares, onSalePlanChange]);
+
+  const throttledCommit = useCallback((val: number) => {
+    const elapsed = Date.now() - lastFiredRef.current;
+    if (elapsed >= SLIDER_THROTTLE_MS) {
+      commit(val);
+    } else {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => commit(val), SLIDER_THROTTLE_MS - elapsed);
+    }
+  }, [commit]);
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[10px] text-surface-400 dark:text-surface-500">
+        <span>כמות למכירה</span>
+        <span className="tabular-nums font-medium text-surface-600 dark:text-surface-300">
+          {localPct}%
+          {localQty > 0 && (
+            <span className="text-surface-400 dark:text-surface-500"> ({localQty.toLocaleString()})</span>
+          )}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={localPct}
+        onChange={(e) => { const v = Number(e.target.value); setLocalPct(v); throttledCommit(v); }}
+        onMouseUp={(e) => commit(Number((e.target as HTMLInputElement).value))}
+        onTouchEnd={(e) => commit(Number((e.target as HTMLInputElement).value))}
+        className="w-full accent-primary-500 cursor-pointer"
+        style={{ WebkitAppearance: 'slider-horizontal' }}
+      />
+      <div className="flex justify-between text-[9px] text-surface-300 dark:text-surface-600 select-none">
+        {TICK_LABELS.map((l) => <span key={l}>{l}</span>)}
+      </div>
     </div>
   );
 }

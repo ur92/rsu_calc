@@ -39,8 +39,6 @@
 }
 
 html {
-  /* Prevent horizontal overflow from appearing as a scrollbar or
-     causing sticky headers to mis-clip on WebKit/Safari mobile. */
   overflow-x: clip;
 }
 
@@ -49,6 +47,9 @@ body {
   background-color: var(--color-surface-50);
   color: var(--color-surface-900);
   direction: rtl;
+  /* clip (unlike hidden) does not create a scroll container, so
+     position:sticky in the header keeps working on iOS Safari. */
+  overflow-x: clip;
 }
 
 .dark body {

@@ -8,6 +8,13 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  { id: 'df0ff5a', date: '2026-05-11', message: 'חדש: בחירת מניות לפי יעד נטו — הזן כמה אתה רוצה לקבל והאפליקציה בוחרת את המניות האופטימליות', type: 'feature' },
+  {
+    "id": "5d5d2e3",
+    "date": "2026-05-11",
+    "message": "תיקון גלילה אופקית לא רצויה במובייל (iOS Safari)",
+    "type": "fix"
+  },
   {
     "id": "469114d",
     "date": "2026-05-11",
