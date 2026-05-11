@@ -8,7 +8,7 @@ alwaysApply: true
 
 This project is the **JFrog RSU/options calculator** (Israeli Section 102 tax analysis). Entries in `app/src/data/changelog.ts` power the header **מה חדש** dropdown.
 
-**Entries must be curated manually in Hebrew.** Do **not** rely on raw English commit subjects as user-facing text. The generator may append commits that match `feat`, `feat(scope)`, `data`, etc., but a developer should replace or add concise Hebrew descriptions for anything that should appear in the product.
+**Entries must be in Hebrew and must use the real short commit hash as the `id`.** Never leave `'pending'` as the final id — it prevents the production build from recognising the entry and the English git subject will override it.
 
 Only add an entry for **product-relevant** changes that are visible to the user.
 
@@ -25,32 +25,57 @@ Only add an entry for **product-relevant** changes that are visible to the user.
 - Linting, formatting, types-only refactors, or build/CI infrastructure
 - Dependency bumps or tooling with no user-visible behavior change
 - Internal refactors with no change to calculator results or UX
+- Git workflow / cursor rules changes
 
-## How to add an entry
+## Mandatory workflow for every product-relevant commit
 
-Add a new object at the **top** of the `changelog` array in `app/src/data/changelog.ts`:
+Follow these steps in order — **do not skip the amend step**:
 
-```typescript
-{ id: '<short-commit-hash>', date: 'YYYY-MM-DD', message: '<Hebrew description>', type: '<type>' },
+### Step 1 — Commit the code (without changelog.ts)
+Stage and commit only the product code changes. Do **not** include `changelog.ts` yet.
+
+### Step 2 — Get the short hash
+```bash
+git log -1 --format='%h'
 ```
 
-- **id**: The short git commit hash. If the hash is unknown before commit, you may use a placeholder like `'pending'`; the generator can reconcile on the next run when aligned with git history.
-- **date**: The change date in `YYYY-MM-DD`.
-- **message**: A short Hebrew sentence from the user’s perspective (not a raw `feat(...):` line).
-- **type**: One of `'feature'`, `'data'`, `'docs'`, `'fix'`, `'update'`.
+### Step 3 — Prepend the entry to changelog.ts
+Add a new object at the **top** of the `changelog` array using the real hash from step 2:
 
-### Type reference
+```typescript
+{ id: '<hash-from-step-2>', date: 'YYYY-MM-DD', message: '<Hebrew description>', type: '<type>' },
+```
+
+- **id**: the short hash obtained in step 2 — never `'pending'`
+- **date**: today's date in `YYYY-MM-DD`
+- **message**: a short Hebrew sentence from the user's perspective — not a raw commit subject
+- **type**: one of `'feature'`, `'data'`, `'docs'`, `'fix'`, `'update'`
+
+### Step 4 — Amend the commit to include changelog.ts
+```bash
+git add app/src/data/changelog.ts
+git commit --amend --no-edit
+```
+
+This embeds the changelog update in the same commit as the code change, with the correct hash already set.
+
+> **Amend is safe here** because: (a) you just created the commit in step 1, (b) it is the HEAD commit, and (c) it has not been pushed yet.  
+> If the commit was already pushed, add the changelog update as a separate follow-up commit instead.
+
+---
+
+## Type reference
 
 | Type | Hebrew label | When to use |
-|------|-------------|------------|
+|---|---|---|
 | `feature` | פיצ׳ר | New capability, screen, or major addition |
 | `data` | נתונים | Tax brackets, rates, prices, or other numbers/data changed |
 | `docs` | מסמך | Documentation or copy that matters to users (if surfaced) |
 | `fix` | תיקון | Bug fix visible in results or the UI |
 | `update` | עדכון | Improvement to existing behavior or content |
 
-## Regeneration from git
+## Static file — no build-time generation
 
-The production build runs `scripts/generate-changelog.js`, which merges conventional commits (`feat`, `feat(scope)`, `data`, `docs`, `fix`, `update`, with or without a scope) with the file and preserves curated rows. Curated Hebrew text for a commit id always wins over the stripped commit subject.
+`changelog.ts` is a **static curated file**. The production build (`npm run build`) does **not** run `generate-changelog.js`. The file committed to git is exactly what ships to production.
 
-Running **`changelog`** from `app/` (`npm run changelog`) regenerates `changelog.ts` from git history. That script **does not** add Hebrew messages automatically—you must edit the file and add or adjust Hebrew `message` text for user-facing entries.
+`npm run changelog` (from `app/`) is available as a one-off helper to pull in missing entries from git history, but it must never be wired back into the build script. After running it, always review and translate any auto-generated English messages to Hebrew before committing.

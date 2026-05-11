@@ -1,0 +1,24 @@
+---
+description: Git branching workflow — dev is the integration branch; never commit to main without explicit request
+globs:
+alwaysApply: true
+---
+
+# Git Workflow
+
+## Branch model
+
+- `main` — production; every push triggers a Netlify deploy. **Never commit or push to `main` without explicit user instruction.**
+- `dev` — integration branch. All new development starts here or on a feature branch rooted in `dev`.
+- Feature branches — branch from `dev`, e.g. `git checkout -b feat/my-feature dev`.
+
+## GitHub remote
+
+Remote is https://github.com/ur92/rsu_calc (public repo on personal GitHub account). Do **not** use https://github.jfrog.info/; that host does not have this repo.
+
+## Rules
+
+1. All new work must be based on `dev` (or a branch off `dev`), never directly off `main`.
+2. Merge feature branches into `dev` first; then fast-forward `main` to `dev` only when the user explicitly asks to deploy/release.
+3. Do **not** `git push origin main` or commit directly to `main` unless the user explicitly says so (e.g. "release", "deploy", "FF main", "push to main").
+4. When creating a PR, target `dev` as the base branch, not `main`, unless deploying.

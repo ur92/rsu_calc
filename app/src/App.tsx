@@ -187,7 +187,7 @@ export default function App() {
   return (
     <div dir="rtl" className="min-h-screen bg-surface-50 dark:bg-surface-950">
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-surface-900/80 backdrop-blur border-b border-surface-200 dark:border-surface-800">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-lg bg-primary-500 text-white flex items-center justify-center shrink-0">
               <Calculator size={18} />
@@ -209,7 +209,7 @@ export default function App() {
               onClick={handleReset}
               className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-surface-300 dark:border-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 text-surface-700 dark:text-surface-300"
             >
-              קובץ חדש
+              <span className="hidden sm:inline">קובץ חדש</span>
               <ArrowRight size={14} />
             </button>
           </div>

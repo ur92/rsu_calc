@@ -123,15 +123,17 @@ These are the precise piecewise brackets used by `marginal_tax_on(annual_income)
 
 ## Bituach Leumi + Mas Briut (employee share)
 
-Two regimes by monthly income:
+Two regimes by monthly income (rates effective from February 2025 / 2026 ceiling):
 
 | Component | Reduced (≤ 7,703 ₪/month) | Full (7,703 – 51,910 ₪/month) |
 |---|---|---|
-| Bituach Leumi | 0.4% | 7.0% |
-| Mas Briut (health) | 3.1% | 5.0% |
-| **Combined** | **3.5%** | **12.0%** |
+| Bituach Leumi | 1.04% | 7.00% |
+| Mas Briut (health) | 3.23% | 5.17% |
+| **Combined** | **4.27%** | **12.17%** |
 
-Income above the **monthly ceiling of 51,910 ₪ (2026)** is not subject to BL/health. For a lump-sum RSU/option event, the marginal-income portion is added to the month's ordinary salary; if the regular salary already exceeds the ceiling, BL/health on the equity portion is effectively zero.
+Income above the **monthly ceiling of 51,910 ₪ (2026)** is not subject to BL/health.
+
+**Ceiling rule for equity income:** the RSU/option/ESPP פירותי (ordinary-income) portion is added to the month's ordinary salary for BL/health purposes. If the employee's regular monthly salary already equals or exceeds the monthly ceiling (51,910 ₪), the equity income adds **zero** additional BL/health — only marginal income tax applies. For example, an employee earning 60,000 ₪/month pays no BL/health on any RSU sale in that month.
 
 ## Combined marginal rate — quick lookup
 

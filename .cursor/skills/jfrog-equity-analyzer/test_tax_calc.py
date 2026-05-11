@@ -278,14 +278,14 @@ class TestBituachLeumi(unittest.TestCase):
         self.assertEqual(tc.bituach_leumi_employee(0), 0.0)
 
     def test_within_reduced_band(self) -> None:
-        self.assertAlmostEqual(tc.bituach_leumi_employee(5_000), 5_000 * 0.035, places=4)
+        self.assertAlmostEqual(tc.bituach_leumi_employee(5_000), 5_000 * 0.0427, places=4)
 
     def test_full_band(self) -> None:
-        expected = 7_703 * 0.035 + (30_000 - 7_703) * 0.12
+        expected = 7_703 * 0.0427 + (30_000 - 7_703) * 0.1217
         self.assertAlmostEqual(tc.bituach_leumi_employee(30_000), expected, places=4)
 
     def test_at_ceiling(self) -> None:
-        expected = 7_703 * 0.035 + (51_910 - 7_703) * 0.12
+        expected = 7_703 * 0.0427 + (51_910 - 7_703) * 0.1217
         self.assertAlmostEqual(tc.bituach_leumi_employee(51_910), expected, places=4)
 
     def test_above_ceiling_no_extra(self) -> None:
@@ -315,6 +315,21 @@ class TestSentinelConstants(unittest.TestCase):
     def test_etrade_trustee_withholding_rates(self) -> None:
         self.assertEqual(tc.ETRADE_TRUSTEE_MARGINAL_WITHHOLD, 0.62)
         self.assertEqual(tc.ETRADE_TRUSTEE_CAPITAL_WITHHOLD, 0.28)
+
+    def test_bl_reduced_rate_2026(self) -> None:
+        self.assertAlmostEqual(tc.BL_REDUCED_RATE, 0.0104, places=6)
+
+    def test_health_reduced_rate_2026(self) -> None:
+        self.assertAlmostEqual(tc.HEALTH_REDUCED_RATE, 0.0323, places=6)
+
+    def test_health_full_rate_2026(self) -> None:
+        self.assertAlmostEqual(tc.HEALTH_FULL_RATE, 0.0517, places=6)
+
+    def test_bl_health_reduced_total_2026(self) -> None:
+        self.assertAlmostEqual(tc.BL_HEALTH_REDUCED_TOTAL, 0.0427, places=6)
+
+    def test_bl_health_full_total_2026(self) -> None:
+        self.assertAlmostEqual(tc.BL_HEALTH_FULL_TOTAL, 0.1217, places=6)
 
 
 if __name__ == "__main__":
