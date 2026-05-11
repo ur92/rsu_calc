@@ -74,8 +74,8 @@ This embeds the changelog update in the same commit as the code change, with the
 | `fix` | תיקון | Bug fix visible in results or the UI |
 | `update` | עדכון | Improvement to existing behavior or content |
 
-## Regeneration from git
+## Static file — no build-time generation
 
-The production build runs `scripts/generate-changelog.js`, which merges conventional commits (`feat`, `feat(scope)`, `data`, `docs`, `fix`, `update`) with the file. **Curated Hebrew text for a commit id always wins over the stripped English commit subject.** Entries whose id does not match any git commit are preserved as-is but may appear out of chronological order.
+`changelog.ts` is a **static curated file**. The production build (`npm run build`) does **not** run `generate-changelog.js`. The file committed to git is exactly what ships to production.
 
-Running `npm run changelog` from `app/` regenerates the file. It does not write Hebrew messages — that is the agent's job, following the workflow above.
+`npm run changelog` (from `app/`) is available as a one-off helper to pull in missing entries from git history, but it must never be wired back into the build script. After running it, always review and translate any auto-generated English messages to Hebrew before committing.
