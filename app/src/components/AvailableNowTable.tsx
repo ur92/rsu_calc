@@ -357,39 +357,44 @@ export default function AvailableNowTable({
             return (
               <div
                 key={item.key}
-                className="flex items-center gap-3 p-3 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900"
+                className="flex flex-col gap-3 p-3 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 sm:flex-row sm:items-center"
               >
-                <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white ${badgeColor}`}>
-                  {rank}
-                </div>
-                <div className="shrink-0 w-52 text-right">
-                  <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{item.label}</p>
-                  <p className="text-xs text-surface-500 mb-2">
-                    {item.type} · {item.maxShares.toLocaleString()} זמינות
-                  </p>
-                  {/* Step slider — 0 / 25% / 50% / 75% / 100% */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[10px] text-surface-400 dark:text-surface-500">
-                      <span>כמות למכירה</span>
-                      <span className="tabular-nums font-medium text-surface-600 dark:text-surface-300">
-                        {STEP_LABELS[qtyToStep(item.planQty, item.maxShares)]}
-                        {item.planQty > 0 && (
-                          <span className="text-surface-400 dark:text-surface-500"> ({item.planQty.toLocaleString()})</span>
-                        )}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={4}
-                      step={1}
-                      value={qtyToStep(item.planQty, item.maxShares)}
-                      onChange={(e) => onStepChange(item.key, item.maxShares, Number(e.target.value))}
-                      className="w-full accent-primary-500 cursor-pointer"
-                      style={{ WebkitAppearance: 'slider-horizontal' }}
-                    />
-                    <div className="flex justify-between text-[9px] text-surface-300 dark:text-surface-600 select-none">
-                      {STEP_LABELS.map((l) => <span key={l}>{l}</span>)}
+                {/* On mobile: badge + name/slider sit in a row.
+                    On sm+: sm:contents makes this wrapper transparent so badge and
+                    name div become direct children of the outer flex row. */}
+                <div className="flex items-start gap-3 sm:contents">
+                  <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white ${badgeColor}`}>
+                    {rank}
+                  </div>
+                  <div className="flex-1 min-w-0 sm:flex-none sm:shrink-0 sm:w-52 text-right">
+                    <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{item.label}</p>
+                    <p className="text-xs text-surface-500 mb-2">
+                      {item.type} · {item.maxShares.toLocaleString()} זמינות
+                    </p>
+                    {/* Step slider — 0 / 25% / 50% / 75% / 100% */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[10px] text-surface-400 dark:text-surface-500">
+                        <span>כמות למכירה</span>
+                        <span className="tabular-nums font-medium text-surface-600 dark:text-surface-300">
+                          {STEP_LABELS[qtyToStep(item.planQty, item.maxShares)]}
+                          {item.planQty > 0 && (
+                            <span className="text-surface-400 dark:text-surface-500"> ({item.planQty.toLocaleString()})</span>
+                          )}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={4}
+                        step={1}
+                        value={qtyToStep(item.planQty, item.maxShares)}
+                        onChange={(e) => onStepChange(item.key, item.maxShares, Number(e.target.value))}
+                        className="w-full accent-primary-500 cursor-pointer"
+                        style={{ WebkitAppearance: 'slider-horizontal' }}
+                      />
+                      <div className="flex justify-between text-[9px] text-surface-300 dark:text-surface-600 select-none">
+                        {STEP_LABELS.map((l) => <span key={l}>{l}</span>)}
+                      </div>
                     </div>
                   </div>
                 </div>
