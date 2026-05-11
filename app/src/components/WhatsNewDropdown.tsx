@@ -66,14 +66,17 @@ export default function WhatsNewDropdown() {
     const pad = 8;
     requestAnimationFrame(() => {
       const r = panel.getBoundingClientRect();
+
       let dy = 0;
-      if (r.bottom > window.innerHeight - pad) {
-        dy = window.innerHeight - pad - r.bottom;
-      }
-      if (r.top + dy < pad) {
-        dy = pad - r.top;
-      }
-      panel.style.transform = dy !== 0 ? `translateY(${dy}px)` : '';
+      if (r.bottom > window.innerHeight - pad) dy = window.innerHeight - pad - r.bottom;
+      if (r.top + dy < pad) dy = pad - r.top;
+
+      let dx = 0;
+      if (r.right > window.innerWidth - pad) dx = window.innerWidth - pad - r.right;
+      if (r.left + dx < pad) dx = pad - r.left;
+
+      panel.style.transform = (dx !== 0 || dy !== 0) ? `translate(${dx}px,${dy}px)` : '';
+
       const r2 = panel.getBoundingClientRect();
       const maxH = Math.max(120, Math.min(480, window.innerHeight - pad * 2, window.innerHeight - r2.top - pad));
       panel.style.maxHeight = `${maxH}px`;
