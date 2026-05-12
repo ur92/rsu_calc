@@ -1,0 +1,48 @@
+---
+description: Testing standards — run before commit, cover bugfixes, plan tests during development
+alwaysApply: true
+---
+
+# Testing — rsu_calc
+
+## Test suite
+
+| Command | What it runs |
+|---|---|
+| `npm test` | Vitest unit tests (52 tests — taxCalc, parseEtrade, surtaxFromSalePlan) |
+| `npm run test:py` | Python regression tests (61 tests — tax_calc, parse_etrade fallback) |
+| `npm run test:e2e` | Playwright E2E — smoke + demo-report full flow |
+
+All commands run from the `app/` directory.
+
+## Before every commit
+
+Run unit tests before staging a commit:
+
+```bash
+cd app && npm test && npm run test:py
+```
+
+E2E tests are slower (require a build); run them when touching parsing, tax logic, or UI components.
+
+## Bugfixes — always ask: is there a test?
+
+When fixing a bug:
+1. Check whether an existing test would have caught it — if so, update it.
+2. If no test covers it, add one before or alongside the fix.
+3. Preferred location:
+   - Tax/math logic → `app/src/lib/__tests__/taxCalc.test.ts` or `surtaxFromSalePlan.test.ts`
+   - Parser logic → `app/src/lib/__tests__/parseEtrade.test.ts` **and** `.cursor/skills/jfrog-equity-analyzer/test_tax_calc.py` (keep both in sync)
+   - UI behaviour → `app/e2e/demo-report.spec.ts` or a new spec under `app/e2e/`
+
+## New features and planning
+
+When planning or implementing a new feature:
+- Identify which test tier covers it (unit / E2E).
+- Write or update tests as part of the same task — not as a follow-up.
+- For new tax rules or bracket changes, mirror the test in both TypeScript and Python.
+- For new UI sections, extend `demo-report.spec.ts` or add a dedicated E2E spec.
+
+## CI
+
+GitHub Actions runs all three suites on every PR and push to `dev`. Tests must pass before merging.
