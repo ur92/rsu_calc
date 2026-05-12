@@ -82,7 +82,7 @@ function parseEspp(rows: Row[]): EsppPurchase[] {
       grantDate: grantDate ?? purchaseDate,
       purchasePrice: num(r[3]),
       purchasedQty: num(r[4]),
-      blockedQty: num(r[12]),
+      blockedQty: num(r[12]) || num(r[7]),
       discountPct: parsePercent(r[15]),
       grantDateFmv: parseDollar(r[16]),
       purchaseDateFmv: parseDollar(r[17]),
@@ -94,7 +94,7 @@ function parseEspp(rows: Row[]): EsppPurchase[] {
 // ─── Restricted Stock (RSU) ────────────────────────────────────────────────
 // Grant row columns:
 //   0 Record Type, 2 Grant Date, 4 Granted Qty., 6 Vested Qty., 7 Unvested Qty.,
-//   11 Grant Number, 14 Blocked Qty.
+//   9 Sellable Qty. (fallback when not blocked), 11 Grant Number, 14 Blocked Qty.
 // Vest Schedule row columns:
 //   0 Record Type, 11 Grant Number, 19 Vest Date, 21 Granted/Vesting Qty.,
 //   25 Vested Qty., 26 Released Qty, 57 FMV at vest (mislabeled "Dividend Market Value at Release")
@@ -116,7 +116,7 @@ function parseRestrictedStock(rows: Row[]): RsuGrant[] {
         grantedQty: num(r[4]),
         vestedQty: num(r[6]),
         unvestedQty: num(r[7]),
-        blockedQty: num(r[14]),
+        blockedQty: num(r[14]) || num(r[9]),
         vestSchedule: [],
       };
       grants.push(current);

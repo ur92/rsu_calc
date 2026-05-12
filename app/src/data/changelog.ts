@@ -8,6 +8,7 @@ export interface ChangelogEntry {
 }
 
 export const changelog: ChangelogEntry[] = [
+  { id: 'cb7308b', date: '2026-05-12', message: 'תיקון: קובץ eTrade שיוצא מחוץ לתקופת הבלאקאוט מנותח כעת בצורה תקינה', type: 'fix' },
   { id: 'df0ff5a', date: '2026-05-11', message: 'חדש: בחירת מניות לפי יעד נטו — הזן כמה אתה רוצה לקבל והאפליקציה בוחרת את המניות האופטימליות', type: 'feature' },
   {
     "id": "5d5d2e3",
