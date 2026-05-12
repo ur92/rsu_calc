@@ -271,18 +271,57 @@ export default function AvailableNowTable({
       return;
     }
 
-    // Greedy allocation: fill lots in priority order (ascending effective tax rate)
+    // Helper: compute true net (after full portfolio surtax) for a given plan
+    const computeActualNet = (plan: Record<string, number>): number => {
+      const agg = jfrogIncomeFromSalePlan(data, plan, priceUSD, rate);
+      const sur = computeSurtax({
+        salaryNIS,
+        jfrogSaleTotalIncomeNIS: agg.totalNIS,
+        jfrogSaleCapitalSourceNIS: agg.capitalSourceNIS,
+        otherCapitalIncomeNIS,
+      });
+      const preNet = rawLots.reduce((s, l) => s + l.netPerShare * (plan[l.key] ?? 0) * rate, 0);
+      return preNet - sur.totalNIS;
+    };
+
     const sorted = [...rawLots].sort((a, b) => a.baseEffectiveTaxRate - b.baseEffectiveTaxRate);
+    const plan: Record<string, number> = Object.fromEntries(rawLots.map(l => [l.key, 0]));
+
+    // First pass: greedy using pre-surtax net per share as approximation
     let remaining = target;
     for (const lot of sorted) {
       const netPS = lot.netPerShare * rate;
-      if (netPS <= 0 || remaining <= 0) {
-        onSalePlanChange(lot.key, 0);
-        continue;
-      }
+      if (netPS <= 0 || remaining <= 0) continue;
       const qty = Math.min(Math.ceil(remaining / netPS), lot.maxShares);
-      onSalePlanChange(lot.key, qty);
+      plan[lot.key] = qty;
       remaining -= netPS * qty;
+    }
+
+    // Top-up pass: surtax reduces actual net below the target — add shares to compensate
+    let actualNet = computeActualNet(plan);
+    let iter = 0;
+    while (actualNet < target - 1 && iter < 5) {
+      iter++;
+      let improved = false;
+      for (const lot of sorted) {
+        if (actualNet >= target - 1) break;
+        const currentQty = plan[lot.key];
+        if (currentQty >= lot.maxShares) continue;
+        const netPS = lot.netPerShare * rate;
+        if (netPS <= 0) continue;
+        const shortage = target - actualNet;
+        const additionalQty = Math.min(Math.ceil(shortage / netPS), lot.maxShares - currentQty);
+        plan[lot.key] = currentQty + additionalQty;
+        const newNet = computeActualNet(plan);
+        if (newNet > actualNet) improved = true;
+        actualNet = newNet;
+      }
+      if (!improved) break;
+    }
+
+    // Apply the final plan
+    for (const lot of rawLots) {
+      onSalePlanChange(lot.key, plan[lot.key] ?? 0);
     }
 
     setWantError(null);
