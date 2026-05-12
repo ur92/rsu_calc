@@ -113,7 +113,7 @@ def parse_espp(rows: list[tuple]) -> list[dict]:
             'grantDate': grant_date or purchase_date,
             'purchasePrice': num(r[3]),
             'purchasedQty': num(r[4]),
-            'blockedQty': num(r[12]),
+            'blockedQty': num(r[12]) or num(r[7]),
             'discountPct': parse_pct(r[15]),
             'grantDateFmv': parse_dollar(r[16]),
             'purchaseDateFmv': parse_dollar(r[17]),
@@ -137,7 +137,7 @@ def parse_rsu(rows: list[tuple]) -> list[dict]:
                 'grantedQty': num(r[4]),
                 'vestedQty': num(r[6]),
                 'unvestedQty': num(r[7]),
-                'blockedQty': num(r[14]),
+                'blockedQty': num(r[14]) or num(r[9]),
                 'vestSchedule': [],
             }
             grants.append(current)
