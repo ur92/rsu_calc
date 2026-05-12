@@ -29,6 +29,7 @@ if str(_skill_dir) not in sys.path:
     sys.path.insert(0, str(_skill_dir))
 
 import tax_calc as tc
+import parse_etrade as pe
 
 
 class TestBracketsAndSurtax(unittest.TestCase):
@@ -330,6 +331,111 @@ class TestSentinelConstants(unittest.TestCase):
 
     def test_bl_health_full_total_2026(self) -> None:
         self.assertAlmostEqual(tc.BL_HEALTH_FULL_TOTAL, 0.1217, places=6)
+
+
+def _wide_row(n: int = 60) -> tuple:
+    return tuple([''] * n)
+
+
+def _rsu_header_row() -> tuple:
+    h = list(_wide_row())
+    h[0] = 'Row Type'
+    h[2] = 'Date'
+    return tuple(h)
+
+
+def _rsu_grant_row(*, blocked: float, sellable: float, grant_number: str = 'TEST-RSU-1') -> tuple:
+    r = list(_wide_row())
+    r[0] = 'Grant'
+    r[2] = '01-MAR-2021'
+    r[4] = 1000
+    r[6] = 100
+    r[7] = 900
+    r[9] = sellable
+    r[11] = grant_number
+    r[14] = blocked
+    return tuple(r)
+
+
+def _rsu_vest_row() -> tuple:
+    r = list(_wide_row())
+    r[0] = 'Vest Schedule'
+    r[19] = '01-MAR-2022'
+    r[21] = 100
+    return tuple(r)
+
+
+def _espp_header_row() -> tuple:
+    h = list(_wide_row())
+    h[0] = 'Row Type'
+    return tuple(h)
+
+
+def _espp_purchase_row(*, blocked: float, sellable: float) -> tuple:
+    r = list(_wide_row())
+    r[0] = 'Purchase'
+    r[2] = '30-SEP-2023'
+    r[3] = 15.0
+    r[4] = 150.0
+    r[7] = sellable
+    r[10] = '01-APR-2023'
+    r[12] = blocked
+    r[15] = 0.15
+    r[16] = 18.0
+    r[17] = 19.0
+    return tuple(r)
+
+
+class TestParseEtradeFallback(unittest.TestCase):
+    """Blocked vs sellable qty fallback (eTrade blackout column moves)."""
+
+    def test_rsu_uses_blocked_qty_when_nonzero(self) -> None:
+        rows = [
+            _rsu_header_row(),
+            _rsu_grant_row(blocked=600, sellable=0),
+            _rsu_vest_row(),
+        ]
+        grants = pe.parse_rsu(rows)
+        self.assertEqual(len(grants), 1)
+        self.assertEqual(grants[0]['blockedQty'], 600.0)
+
+    def test_rsu_falls_back_to_sellable_when_blocked_empty(self) -> None:
+        rows = [
+            _rsu_header_row(),
+            _rsu_grant_row(blocked=0, sellable=600),
+            _rsu_vest_row(),
+        ]
+        grants = pe.parse_rsu(rows)
+        self.assertEqual(len(grants), 1)
+        self.assertEqual(grants[0]['blockedQty'], 600.0)
+
+    def test_rsu_both_zero(self) -> None:
+        rows = [
+            _rsu_header_row(),
+            _rsu_grant_row(blocked=0, sellable=0),
+            _rsu_vest_row(),
+        ]
+        grants = pe.parse_rsu(rows)
+        self.assertEqual(len(grants), 1)
+        self.assertEqual(grants[0]['blockedQty'], 0.0)
+
+    def test_espp_uses_blocked_qty_when_nonzero(self) -> None:
+        rows = [_espp_header_row(), _espp_purchase_row(blocked=150, sellable=0)]
+        out = pe.parse_espp(rows)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['blockedQty'], 150.0)
+
+    def test_espp_falls_back_to_sellable_when_blocked_empty(self) -> None:
+        rows = [_espp_header_row(), _espp_purchase_row(blocked=0, sellable=150)]
+        out = pe.parse_espp(rows)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['blockedQty'], 150.0)
+
+    def test_espp_both_zero(self) -> None:
+        rows = [_espp_header_row(), _espp_purchase_row(blocked=0, sellable=0)]
+        out = pe.parse_espp(rows)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['blockedQty'], 0.0)
 
 
 if __name__ == "__main__":

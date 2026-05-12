@@ -15,6 +15,12 @@ app/.tmp/
 .idea/
 *.swp
 
+# test artifacts (generated, never committed)
+app/playwright-report/
+app/test-results/
+**/__pycache__/
+**/*.pyc
+
 # user uploads & screenshots — never commit personal data
 *.xlsx
 *.xls

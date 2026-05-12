@@ -33,7 +33,9 @@ export default function PriceSimulator({
   const [draftRate, setDraftRate] = useState(rate);
 
   // Sync draft when parent changes (e.g. live price arrives, or reset to live)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setDraftPrice(priceUSD); }, [priceUSD]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setDraftRate(rate); }, [rate]);
 
   const priceILS = (priceUSD * rate).toFixed(2);
