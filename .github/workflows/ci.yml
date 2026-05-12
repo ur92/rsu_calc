@@ -62,7 +62,8 @@ jobs:
       - name: Read Playwright version for cache key
         id: playwright-version
         working-directory: app
-        run: echo "version=$(node -p \"require('@playwright/test/package.json').version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
