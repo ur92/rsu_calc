@@ -11,7 +11,6 @@ import {
 import { jfrogIncomeFromSalePlan } from '../lib/surtaxFromSalePlan';
 import { formatILS } from '../lib/format';
 import TaxBreakdownTooltip from './TaxBreakdownTooltip';
-import { CircleHelp as _CircleHelp } from 'lucide-react'; // kept for potential future use
 
 // ── Slider tick labels (decorative reference marks) ─────────────────────────
 const TICK_LABELS = ['0', '25%', '50%', '75%', '100%'] as const;
@@ -387,7 +386,6 @@ export default function AvailableNowTable({
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') { setWantOpen(false); setWantError(null); setWantValue(''); }
                   }}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
                   autoFocus
                   className="w-20 px-2 py-1 rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-800 dark:text-surface-200 tabular-nums focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
@@ -524,6 +522,7 @@ function LotSlider({
   const committedPct = maxShares > 0 ? Math.round(planQty / maxShares * 100) : 0;
   const [localPct, setLocalPct] = useState(committedPct);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setLocalPct(committedPct); }, [committedPct]);
 
   const localQty = Math.round(maxShares * localPct / 100);

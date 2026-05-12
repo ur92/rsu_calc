@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+
+jobs:
+  unit:
+    name: Unit tests (Vitest + Python)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install npm dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Run TypeScript unit tests
+        working-directory: app
+        run: npm test
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install openpyxl
+
+      - name: Run Python regression tests
+        working-directory: app
+        run: npm run test:py
+
+  e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install npm dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Read Playwright version for cache key
+        id: playwright-version
+        working-directory: app
+        run: echo "version=$(node -p \"require('@playwright/test/package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright Chromium + system deps
+        working-directory: app
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: app
+        run: npm run test:e2e
+
+  typecheck:
+    name: Typecheck + Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install npm dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: TypeScript typecheck
+        working-directory: app
+        run: npm run typecheck
+
+      - name: ESLint
+        working-directory: app
+        run: npm run lint

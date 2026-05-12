@@ -183,9 +183,8 @@ function parseOptions(rows: Row[]): OptionGrant[] {
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
-export async function parseEtradeFile(file: File): Promise<ParsedData> {
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+export function parseEtradeXlsx(buffer: ArrayBuffer): ParsedData {
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
 
   const findSheet = (...names: string[]): Row[] => {
     for (const name of names) {
@@ -204,4 +203,9 @@ export async function parseEtradeFile(file: File): Promise<ParsedData> {
     rsus: parseRestrictedStock(rsuRows),
     options: parseOptions(optRows),
   };
+}
+
+export async function parseEtradeFile(file: File): Promise<ParsedData> {
+  const buf = await file.arrayBuffer();
+  return parseEtradeXlsx(buf);
 }

@@ -131,6 +131,7 @@ export default function PortfolioOverview({
     const quarterlyData = Array.from(quarterMap.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([, v]) => {
+        // eslint-disable-next-line react-hooks/immutability
         cumulative += v.netILS;
         return { name: v.label, 'נטו ברבעון': Math.round(v.netILS), מצטבר: Math.round(cumulative) };
       });
